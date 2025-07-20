@@ -1,0 +1,20 @@
+{
+  "environment": "local",
+  "rpcUrl": "http://localhost:8899",
+  "authority": "AyrDj67STAAt9UHc28S694scrq955vbH54rAMtmuQBME",
+  "tokens": [
+    {
+      "symbol": "USDC",
+      "mint": "4km1cSQMevYHotypjmZ5gQ7RJu3YQXZ1KbjdwRowK73y",
+      "decimals": 6,
+      "supply": 1000000
+    },
+    {
+      "symbol": "USDT",
+      "mint": "5mAMcMia6BUtF1nT87R6fngkp1w1ygy6Jxt8hGqmRe5h",
+      "decimals": 6,
+      "supply": 1000000
+    }
+  ],
+  "createdAt": "2025-07-20T02:42:04.362Z"
+}

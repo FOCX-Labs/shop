@@ -1,0 +1,20 @@
+{
+  "environment": "devnet",
+  "rpcUrl": "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef",
+  "authority": "AyrDj67STAAt9UHc28S694scrq955vbH54rAMtmuQBME",
+  "tokens": [
+    {
+      "symbol": "USDC",
+      "mint": "8Kw5dJFeaqUrh6o4ioC7tqqxCV8h5xf6P2mQcNHEHHHz",
+      "decimals": 6,
+      "supply": 1000000
+    },
+    {
+      "symbol": "USDT",
+      "mint": "6iKVXXZm3sfi6PJkDQ4qvRttU59xfRQnTg3e91jMbxyA",
+      "decimals": 6,
+      "supply": 1000000
+    }
+  ],
+  "createdAt": "2025-07-20T03:10:28.234Z"
+}

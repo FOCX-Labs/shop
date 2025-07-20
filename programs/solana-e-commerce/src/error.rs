@@ -1,0 +1,198 @@
+use anchor_lang::prelude::*;
+
+#[error_code]
+pub enum ErrorCode {
+    // ID生成器相关错误
+    #[msg("缺少关键词账户")]
+    MissingKeywordAccount,
+    #[msg("关键词数量超出限制")]
+    TooManyKeywords,
+    #[msg("分片空间不足")]
+    ShardFull,
+    #[msg("ID生成失败")]
+    IdGenerationFailed,
+    #[msg("租金计算失败")]
+    RentCalculationFailed,
+    #[msg("商户未注册")]
+    MerchantNotRegistered,
+    #[msg("ID已被使用")]
+    IdAlreadyInUse,
+    #[msg("ID不存在")]
+    IdNotFound,
+    #[msg("ID区间超出范围")]
+    IdRangeOverflow,
+    #[msg("无可用ID")]
+    NoAvailableId,
+    #[msg("无效的ID")]
+    InvalidId,
+
+    // 商品相关错误
+    #[msg("商品不存在")]
+    ProductNotFound,
+    #[msg("无效的商品")]
+    InvalidProduct,
+    #[msg("无效的商品账户")]
+    InvalidProductAccount,
+    #[msg("无效的价格")]
+    InvalidPrice,
+    #[msg("无效的商品名称长度")]
+    InvalidProductNameLength,
+    #[msg("无效的商品描述长度")]
+    InvalidProductDescriptionLength,
+
+    // 商户相关错误
+    #[msg("无效的商户")]
+    InvalidMerchant,
+    #[msg("无效的商户名称长度")]
+    InvalidMerchantNameLength,
+    #[msg("无效的商户描述长度")]
+    InvalidMerchantDescriptionLength,
+    #[msg("未授权的商户操作")]
+    UnauthorizedMerchant,
+
+    // 关键词相关错误
+    #[msg("无效的关键词")]
+    InvalidKeyword,
+    #[msg("无效的关键词长度")]
+    InvalidKeywordLength,
+    #[msg("无效的关键词数量")]
+    InvalidKeywordCount,
+    #[msg("重复的关键词")]
+    DuplicateKeyword,
+
+    // 索引相关错误
+    #[msg("分片已满")]
+    ShardIsFull,
+    #[msg("无效的分片索引")]
+    InvalidShardIndex,
+    #[msg("价格索引节点不存在")]
+    PriceIndexNodeNotFound,
+    #[msg("销量索引节点不存在")]
+    SalesIndexNodeNotFound,
+    #[msg("无效的价格区间")]
+    InvalidPriceRange,
+    #[msg("无效的销量区间")]
+    InvalidSalesRange,
+    #[msg("布隆过滤器更新失败")]
+    BloomFilterUpdateFailed,
+    #[msg("关键词索引不为空")]
+    KeywordIndexNotEmpty,
+    #[msg("关键词分片不为空")]
+    KeywordShardNotEmpty,
+    #[msg("商户仍有活跃产品")]
+    MerchantHasActiveProducts,
+    #[msg("ID块不为空")]
+    IdChunkNotEmpty,
+    #[msg("商户ID账户不为空")]
+    MerchantIdAccountNotEmpty,
+
+    // 支付相关错误
+    #[msg("不支持的代币")]
+    UnsupportedToken,
+    #[msg("代币余额不足")]
+    InsufficientTokenBalance,
+    #[msg("SOL余额不足")]
+    InsufficientSolBalance,
+    #[msg("无效的代币金额")]
+    InvalidTokenAmount,
+    #[msg("代币转账失败")]
+    TokenTransferFailed,
+    #[msg("手续费计算错误")]
+    FeeCalculationError,
+    #[msg("支付配置未找到")]
+    PaymentConfigNotFound,
+    #[msg("代币未激活")]
+    TokenNotActive,
+    #[msg("低于最小交易金额")]
+    BelowMinimumAmount,
+    #[msg("商品创建失败")]
+    ProductCreationFailed,
+    #[msg("原子操作失败")]
+    AtomicOperationFailed,
+    #[msg("无效的手续费率")]
+    InvalidFeeRate,
+    #[msg("代币数量过多")]
+    TooManyTokens,
+    #[msg("无效的代币符号")]
+    InvalidTokenSymbol,
+    #[msg("无效的代币精度")]
+    InvalidTokenDecimals,
+    #[msg("无效的订单状态")]
+    InvalidOrderStatus,
+    #[msg("无效的支付方式")]
+    InvalidPaymentMethod,
+
+    // 订单相关错误
+    #[msg("订单不存在")]
+    OrderNotFound,
+    #[msg("无效的订单数量")]
+    InvalidOrderQuantity,
+    #[msg("无效的订单价格")]
+    InvalidOrderPrice,
+    #[msg("无效的订单总金额")]
+    InvalidOrderTotalAmount,
+    #[msg("无效的订单代币价格")]
+    InvalidOrderTokenPrice,
+    #[msg("无效的订单代币总金额")]
+    InvalidOrderTokenTotalAmount,
+    #[msg("无效的收货地址长度")]
+    InvalidShippingAddressLength,
+    #[msg("无效的订单备注长度")]
+    InvalidOrderNotesLength,
+    #[msg("无效的交易签名")]
+    InvalidTransactionSignature,
+    #[msg("无效的订单状态转换")]
+    InvalidOrderStatusTransition,
+    #[msg("订单无法修改")]
+    OrderCannotBeModified,
+    #[msg("订单无法退款")]
+    OrderCannotBeRefunded,
+    #[msg("订单已存在")]
+    OrderAlreadyExists,
+
+    // 系统相关错误
+    #[msg("未授权操作")]
+    Unauthorized,
+    #[msg("无效的时间戳")]
+    InvalidTimestamp,
+    #[msg("无效的账户所有者")]
+    InvalidAccountOwner,
+    #[msg("无效的账户数据")]
+    InvalidAccountData,
+    #[msg("无效的账户大小")]
+    InvalidAccountSize,
+    #[msg("无效的PDA")]
+    InvalidPda,
+    #[msg("无效的账户种子")]
+    InvalidAccountSeeds,
+    #[msg("无效的账户bump")]
+    InvalidAccountBump,
+    #[msg("余额不足")]
+    InsufficientFunds,
+    #[msg("无效的活跃块")]
+    InvalidActiveChunk,
+    #[msg("账户判别器不匹配")]
+    AccountDiscriminatorMismatch,
+    #[msg("账户数量不足")]
+    InsufficientAccounts,
+
+    // 保证金相关错误
+    #[msg("保证金不足")]
+    InsufficientDeposit,
+    #[msg("锁定保证金不足")]
+    InsufficientLockedDeposit,
+    #[msg("无效的保证金代币")]
+    InvalidDepositToken,
+    #[msg("保证金金额无效")]
+    InvalidDepositAmount,
+    #[msg("商户保证金不足，无法进行交易")]
+    MerchantDepositInsufficient,
+    #[msg("保证金已锁定")]
+    DepositAlreadyLocked,
+    #[msg("保证金未锁定")]
+    DepositNotLocked,
+    #[msg("算术溢出")]
+    ArithmeticOverflow,
+    #[msg("算术下溢")]
+    ArithmeticUnderflow,
+}
