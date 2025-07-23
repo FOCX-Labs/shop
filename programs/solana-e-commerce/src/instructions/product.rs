@@ -22,7 +22,7 @@ pub struct DeleteProduct<'info> {
         constraint = force || product.merchant == merchant.key() @ ErrorCode::Unauthorized,
         close = beneficiary
     )]
-    pub product: Account<'info, Product>,
+    pub product: Account<'info, ProductBase>,
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
@@ -40,11 +40,11 @@ pub struct UpdateSales<'info> {
         seeds = [b"product", product_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub product: Account<'info, Product>,
+    pub product: Account<'info, ProductBase>,
 }
 
 #[derive(Accounts)]
-#[instruction(product_id: u64, new_price: u64, new_token_price: u64)]
+#[instruction(product_id: u64, new_price: u64)]
 pub struct UpdateProductPrice<'info> {
     #[account(mut)]
     pub merchant: Signer<'info>,
@@ -55,7 +55,7 @@ pub struct UpdateProductPrice<'info> {
         bump,
         constraint = product.merchant == merchant.key() @ ErrorCode::Unauthorized
     )]
-    pub product: Account<'info, Product>,
+    pub product: Account<'info, ProductBase>,
 
     #[account(
         mut,
@@ -65,18 +65,18 @@ pub struct UpdateProductPrice<'info> {
     pub merchant_info: Account<'info, Merchant>,
 }
 
-/// 原子化商品创建指令 - 优化后的账户结构（删除无用的索引账户）
+/// 创建ProductBase指令 - 只处理核心业务数据
 #[derive(Accounts)]
 #[instruction(
     name: String,
     description: String,
     price: u64,
     keywords: Vec<String>,
+    inventory: u64,
     payment_token: Pubkey,
-    token_decimals: u8,
-    token_price: u64
+    shipping_location: String
 )]
-pub struct CreateProductAtomic<'info> {
+pub struct CreateProductBase<'info> {
     #[account(mut)]
     pub merchant: Signer<'info>,
 
@@ -107,6 +107,12 @@ pub struct CreateProductAtomic<'info> {
     )]
     pub active_chunk: Account<'info, IdChunk>,
 
+    #[account(
+        seeds = [b"payment_config"],
+        bump
+    )]
+    pub payment_config: Account<'info, PaymentConfig>,
+
     /// CHECK: 产品账户将在指令中创建
     #[account(mut)]
     pub product_account: UncheckedAccount<'info>,
@@ -114,22 +120,60 @@ pub struct CreateProductAtomic<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 原子化商品创建函数 - 只创建商品，不处理索引
-pub fn create_product_atomic(
-    ctx: Context<CreateProductAtomic>,
+/// 创建ProductExtended指令 - 只处理扩展营销数据
+#[derive(Accounts)]
+#[instruction(
+    product_id: u64,
+    image_video_urls: Vec<String>,
+    sales_regions: Vec<String>,
+    logistics_methods: Vec<String>
+)]
+pub struct CreateProductExtended<'info> {
+    #[account(mut)]
+    pub merchant: Signer<'info>,
+
+    #[account(
+        init,
+        payer = merchant,
+        space = 8 + ProductExtended::INIT_SPACE,
+        seeds = [b"product_extended", product_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub product_extended: Account<'info, ProductExtended>,
+
+    #[account(
+        seeds = [b"product", product_id.to_le_bytes().as_ref()],
+        bump,
+        constraint = product_base.merchant == merchant.key() @ ErrorCode::Unauthorized
+    )]
+    pub product_base: Account<'info, ProductBase>,
+
+    pub system_program: Program<'info, System>,
+}
+
+/// 创建ProductBase函数 - 只创建核心业务数据
+pub fn create_product_base(
+    ctx: Context<CreateProductBase>,
     name: String,
     description: String,
     price: u64,
     keywords: Vec<String>,
+    inventory: u64,
     payment_token: Pubkey,
-    token_decimals: u8,
-    token_price: u64,
+    shipping_location: String,
 ) -> Result<u64> {
     // 验证输入参数
     require!(keywords.len() <= 3, ErrorCode::TooManyKeywords);
     require!(keywords.len() > 0, ErrorCode::InvalidKeyword);
     require!(price > 0, ErrorCode::InvalidPrice);
-    require!(token_price > 0, ErrorCode::InvalidPrice);
+
+    // 验证支付代币是否被支持
+    require!(
+        ctx.accounts
+            .payment_config
+            .is_token_supported(&payment_token),
+        ErrorCode::UnsupportedToken
+    );
 
     // 1. 生成产品ID
     let product_id = generate_next_product_id(
@@ -146,26 +190,22 @@ pub fn create_product_atomic(
         ctx.program_id,
     )?;
 
-    // 3. 初始化产品数据
-    let product_data = Product {
+    // 3. 初始化产品基础数据
+    let product_data = ProductBase {
         id: product_id,
         merchant: ctx.accounts.merchant.key(),
         name: name.clone(),
         description: description.clone(),
         price,
-        keywords: keywords.clone(),
+        keywords: keywords.join(","),
+        inventory,
         payment_token,
-        token_decimals,
-        token_price,
         sales: 0,
         is_active: true,
         created_at: Clock::get()?.unix_timestamp,
         updated_at: Clock::get()?.unix_timestamp,
+        shipping_location,
         bump: 0, // 将在后续设置
-        image_video_urls: Vec::new(),
-        shipping_location: String::new(),
-        sales_regions: Vec::new(),
-        logistics_methods: Vec::new(),
     };
 
     // 4. 序列化产品数据
@@ -185,6 +225,41 @@ pub fn create_product_atomic(
     );
 
     Ok(product_id)
+}
+
+/// 创建ProductExtended函数 - 只创建扩展营销数据
+pub fn create_product_extended(
+    ctx: Context<CreateProductExtended>,
+    product_id: u64,
+    image_video_urls: Vec<String>,
+    sales_regions: Vec<String>,
+    logistics_methods: Vec<String>,
+) -> Result<()> {
+    // 验证输入参数
+    require!(image_video_urls.len() <= 10, ErrorCode::TooManyImageUrls);
+    require!(sales_regions.len() <= 20, ErrorCode::TooManySalesRegions);
+    require!(
+        logistics_methods.len() <= 10,
+        ErrorCode::TooManyLogisticsMethods
+    );
+
+    // 初始化ProductExtended数据
+    let product_extended_data = ProductExtended {
+        product_id,
+        image_video_urls: image_video_urls.join(","),
+        sales_regions: sales_regions.join(","),
+        logistics_methods: logistics_methods.join(","),
+        bump: ctx.bumps.product_extended,
+    };
+
+    // 设置账户数据
+    ctx.accounts
+        .product_extended
+        .set_inner(product_extended_data);
+
+    msg!("ProductExtended创建成功，产品ID: {}", product_id);
+
+    Ok(())
 }
 
 // ==================== 辅助函数 ====================
@@ -208,7 +283,7 @@ fn create_product_account<'info>(
     );
 
     let rent = Rent::get()?;
-    let space = Product::LEN;
+    let space = 8 + ProductBase::INIT_SPACE;
     let lamports = rent.minimum_balance(space);
 
     anchor_lang::system_program::create_account(
@@ -298,8 +373,8 @@ pub fn delete_product(
     }
 
     // 记录需要清理的索引信息
-    let keywords = product.keywords.clone();
-    let token_price = product.token_price;
+    let keywords = product.parse_keywords();
+    let price = product.price;
     let sales = product.sales;
 
     if hard_delete {
@@ -324,9 +399,9 @@ pub fn delete_product(
 
     // 索引清理逻辑（需要通过专门的指令执行）
     msg!(
-        "需要清理的索引信息 - 关键词: {:?}, Token价格: {}, 销量: {}",
+        "需要清理的索引信息 - 关键词: {:?}, 价格: {}, 销量: {}",
         keywords,
-        token_price,
+        price,
         sales
     );
 
@@ -355,14 +430,11 @@ pub fn update_product_price(
     ctx: Context<UpdateProductPrice>,
     _product_id: u64,
     new_price: u64,
-    new_token_price: u64,
 ) -> Result<()> {
     require!(new_price > 0, ErrorCode::InvalidPrice);
-    require!(new_token_price > 0, ErrorCode::InvalidPrice);
 
     let product = &mut ctx.accounts.product;
     let old_price = product.price;
-    let old_token_price = product.token_price;
 
     // 验证权限：只有商品所有者可以修改价格
     require!(
@@ -372,17 +444,121 @@ pub fn update_product_price(
 
     // 更新产品价格
     product.price = new_price;
-    product.token_price = new_token_price;
     product.updated_at = Clock::get()?.unix_timestamp;
 
     msg!(
-        "商品价格更新成功，ID: {}, 旧价格: {} -> 新价格: {}, 旧Token价格: {} -> 新Token价格: {}",
+        "商品价格更新成功，ID: {}, 旧价格: {} -> 新价格: {}",
         product.id,
         old_price,
-        new_price,
-        old_token_price,
-        new_token_price
+        new_price
     );
+
+    Ok(())
+}
+
+// 更新商品信息
+#[derive(Accounts)]
+#[instruction(product_id: u64)]
+pub struct UpdateProduct<'info> {
+    #[account(mut)]
+    pub merchant: Signer<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"product", product_id.to_le_bytes().as_ref()],
+        bump,
+        constraint = product.merchant == merchant.key() @ ErrorCode::Unauthorized
+    )]
+    pub product: Account<'info, ProductBase>,
+
+    #[account(
+        seeds = [b"payment_config"],
+        bump
+    )]
+    pub payment_config: Account<'info, PaymentConfig>,
+}
+
+pub fn update_product(
+    ctx: Context<UpdateProduct>,
+    _product_id: u64,
+    name: Option<String>,
+    description: Option<String>,
+    price: Option<u64>,
+    keywords: Option<Vec<String>>,
+    inventory: Option<u64>,
+    payment_token: Option<Pubkey>,
+    image_video_urls: Option<Vec<String>>,
+    shipping_location: Option<String>,
+    sales_regions: Option<Vec<String>>,
+    logistics_methods: Option<Vec<String>>,
+) -> Result<()> {
+    let product = &mut ctx.accounts.product;
+
+    // 更新名称
+    if let Some(new_name) = name {
+        require!(!new_name.is_empty(), ErrorCode::InvalidProductNameLength);
+        product.name = new_name;
+    }
+
+    // 更新描述
+    if let Some(new_description) = description {
+        product.description = new_description;
+    }
+
+    // 更新价格
+    if let Some(new_price) = price {
+        require!(new_price > 0, ErrorCode::InvalidPrice);
+        product.price = new_price;
+    }
+
+    // 更新关键词（现在在ProductBase中）
+    if let Some(new_keywords) = keywords {
+        require!(new_keywords.len() <= 3, ErrorCode::TooManyKeywords);
+        require!(new_keywords.len() > 0, ErrorCode::InvalidKeyword);
+        product.update_keywords(new_keywords)?;
+    }
+
+    // 更新库存
+    if let Some(new_inventory) = inventory {
+        product.inventory = new_inventory;
+    }
+
+    // 更新支付代币
+    if let Some(new_payment_token) = payment_token {
+        require!(
+            ctx.accounts
+                .payment_config
+                .is_token_supported(&new_payment_token),
+            ErrorCode::UnsupportedToken
+        );
+        product.payment_token = new_payment_token;
+    }
+
+    // 注意：token_decimals 和 token_price 字段已移除，价格统一使用 price 字段
+
+    // TODO: 扩展字段更新需要通过ProductExtended账户处理
+    if let Some(_new_image_video_urls) = image_video_urls {
+        msg!("图片视频URL更新功能暂时禁用，需要通过ProductExtended账户处理");
+    }
+
+    // 更新发货地点（这个字段在ProductBase中）
+    if let Some(new_shipping_location) = shipping_location {
+        product.shipping_location = new_shipping_location;
+    }
+
+    // TODO: 扩展字段更新需要通过ProductExtended账户处理
+    if let Some(_new_sales_regions) = sales_regions {
+        msg!("销售区域更新功能暂时禁用，需要通过ProductExtended账户处理");
+    }
+
+    if let Some(_new_logistics_methods) = logistics_methods {
+        msg!("物流方式更新功能暂时禁用，需要通过ProductExtended账户处理");
+    }
+
+    // 更新时间戳
+    product.updated_at = Clock::get()?.unix_timestamp;
+
+    msg!("商品信息更新成功，ID: {}", product.id);
 
     Ok(())
 }

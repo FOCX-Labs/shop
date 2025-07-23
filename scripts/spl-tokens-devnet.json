@@ -4,17 +4,17 @@
   "authority": "AyrDj67STAAt9UHc28S694scrq955vbH54rAMtmuQBME",
   "tokens": [
     {
-      "symbol": "USDC",
-      "mint": "8Kw5dJFeaqUrh6o4ioC7tqqxCV8h5xf6P2mQcNHEHHHz",
-      "decimals": 6,
-      "supply": 1000000
+      "symbol": "DXDV",
+      "mint": "DXDVt289yXEcqXDd9Ub3HqSBTWwrmNB8DzQEagv9Svtu",
+      "decimals": 9,
+      "tokenPrice": 1
     },
     {
       "symbol": "USDT",
-      "mint": "6iKVXXZm3sfi6PJkDQ4qvRttU59xfRQnTg3e91jMbxyA",
-      "decimals": 6,
-      "supply": 1000000
+      "mint": "97vfAdgJmX84paoWSk2W1qUthbpdcekgJYoKmReggxh7",
+      "decimals": 9,
+      "supply": 10000000000000000000
     }
   ],
-  "createdAt": "2025-07-20T03:10:28.234Z"
+  "createdAt": "2025-07-23T01:19:00.255Z"
 }

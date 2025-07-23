@@ -1,9 +1,11 @@
 use anchor_lang::prelude::*;
 
 #[account]
+#[derive(InitSpace)]
 pub struct PriceIndexNode {
     pub price_range_start: u64,
     pub price_range_end: u64,
+    #[max_len(1000)]
     pub product_ids: Vec<u64>,
     pub left_child: Option<Pubkey>,
     pub right_child: Option<Pubkey>,
@@ -13,9 +15,6 @@ pub struct PriceIndexNode {
 }
 
 impl PriceIndexNode {
-    pub const LEN: usize =
-        8 + 8 + 8 + (4 + super::MAX_PRODUCTS_PER_SHARD * 8) + 33 + 33 + 33 + 1 + 1;
-
     pub fn seeds(price_range_start: u64, price_range_end: u64) -> Vec<Vec<u8>> {
         vec![
             b"price_index".to_vec(),

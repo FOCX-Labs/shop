@@ -6,6 +6,7 @@ pub mod payment;
 pub mod price_index;
 pub mod product;
 pub mod sales_index;
+pub mod user_purchase_count;
 
 pub use id_generator::*;
 pub use keyword_index::*;
@@ -15,6 +16,7 @@ pub use payment::*;
 pub use price_index::*;
 pub use product::*;
 pub use sales_index::*;
+pub use user_purchase_count::*;
 
 // 系统常量
 pub const MAX_PRODUCTS_PER_SHARD: usize = 100;

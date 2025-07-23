@@ -2,10 +2,6 @@ use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
-
-
-
-
 #[derive(Accounts)]
 #[instruction(keyword: String, product_id: u64)]
 pub struct RemoveProductFromKeywordIndex<'info> {
@@ -46,7 +42,7 @@ pub struct CreateKeywordShard<'info> {
     #[account(
         init,
         payer = payer,
-        space = KeywordShard::LEN,
+        space = 8 + KeywordShard::INIT_SPACE,
         seeds = [b"keyword_shard", keyword.as_bytes(), shard_index.to_le_bytes().as_ref()],
         bump
     )]
@@ -103,8 +99,6 @@ pub struct CloseKeywordShard<'info> {
 
     pub authority: Signer<'info>,
 }
-
-
 
 pub fn remove_product_from_keyword_index(
     ctx: Context<RemoveProductFromKeywordIndex>,
@@ -291,7 +285,7 @@ pub struct InitializeKeywordIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = KeywordRoot::LEN,
+        space = 8 + KeywordRoot::INIT_SPACE,
         seeds = [b"keyword_root", keyword.as_bytes()],
         bump
     )]
@@ -300,7 +294,7 @@ pub struct InitializeKeywordIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = KeywordShard::LEN,
+        space = 8 + KeywordShard::INIT_SPACE,
         seeds = [b"keyword_shard", keyword.as_bytes(), 0u32.to_le_bytes().as_ref()],
         bump
     )]
@@ -358,7 +352,7 @@ pub struct AddProductToKeywordIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = KeywordRoot::LEN,
+        space = 8 + KeywordRoot::INIT_SPACE,
         seeds = [b"keyword_root", keyword.as_bytes()],
         bump
     )]
@@ -367,7 +361,7 @@ pub struct AddProductToKeywordIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = KeywordShard::LEN,
+        space = 8 + KeywordShard::INIT_SPACE,
         seeds = [b"keyword_shard", keyword.as_bytes(), 0u32.to_le_bytes().as_ref()],
         bump
     )]
@@ -430,11 +424,7 @@ pub fn add_product_to_keyword_index_if_needed(
     target_shard.product_ids.push(product_id);
     keyword_root.total_products += 1;
 
-    msg!(
-        "产品 {} 已添加到关键词索引 '{}'",
-        product_id,
-        keyword
-    );
+    msg!("产品 {} 已添加到关键词索引 '{}'", product_id, keyword);
 
     Ok(())
 }

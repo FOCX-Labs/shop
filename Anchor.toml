@@ -6,19 +6,19 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-solana_e_commerce = "5y3FcQs2Ar6kTqpsJpJdHRJih3G9WDtsmkiNX54UtPiq"
+solana_e_commerce = "mo5xPstZDm27CAkcyoTJnEovMYcW45tViAU6PZikv5q"
 
 [programs.localnet]
-solana_e_commerce = "5y3FcQs2Ar6kTqpsJpJdHRJih3G9WDtsmkiNX54UtPiq"
+solana_e_commerce = "mo5xPstZDm27CAkcyoTJnEovMYcW45tViAU6PZikv5q"
 
 [programs.testnet]
-solana_e_commerce = "5y3FcQs2Ar6kTqpsJpJdHRJih3G9WDtsmkiNX54UtPiq"
+solana_e_commerce = "mo5xPstZDm27CAkcyoTJnEovMYcW45tViAU6PZikv5q"
 
 [registry]
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "Localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

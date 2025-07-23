@@ -5,58 +5,57 @@ pub const MAX_CHUNKS_PER_MERCHANT: u32 = 100;
 pub const ID_CHUNK_BITMAP_SIZE: usize = 1250; // 10,000位/8 = 1250字节
 
 #[account]
+#[derive(InitSpace)]
 pub struct GlobalIdRoot {
     pub last_merchant_id: u32,
     pub last_global_id: u64,
     pub chunk_size: u32,
+    #[max_len(100)]
     pub merchants: Vec<Pubkey>,
     pub max_products_per_shard: u16,
     pub max_keywords_per_product: u8,
     pub bloom_filter_size: u16,
-    pub cache_ttl: u32,
     pub bump: u8,
 }
 
 impl GlobalIdRoot {
-    pub const LEN: usize = 8 + 4 + 8 + 4 + (4 + 32 * 100) + 2 + 1 + 2 + 4 + 1; // 预留100个商户，避免超过10KB限制
-
     pub fn seeds() -> &'static [&'static [u8]] {
         &[b"global_id_root"]
     }
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct MerchantIdAccount {
     pub merchant_id: u32,
     pub last_chunk_index: u32,
     pub last_local_id: u32,
     pub active_chunk: Pubkey,
+    #[max_len(100)]
     pub unused_chunks: Vec<Pubkey>,
     pub bump: u8,
 }
 
 impl MerchantIdAccount {
-    pub const LEN: usize = 8 + 4 + 4 + 4 + 32 + (4 + 32 * 100) + 1; // 预留100个块
-
     pub fn seeds(merchant: &Pubkey) -> Vec<Vec<u8>> {
         vec![b"merchant_id".to_vec(), merchant.as_ref().to_vec()]
     }
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct IdChunk {
     pub merchant_id: u32,
     pub chunk_index: u32,
     pub start_id: u64,
     pub end_id: u64,
     pub next_available: u32,
-    pub bitmap: Vec<u8>, // 改为Vec<u8>以避免栈溢出
+    #[max_len(1250)]
+    pub bitmap: Vec<u8>, // 改为Vec<u8>以避免栈溢出，最大1250字节
     pub bump: u8,
 }
 
 impl IdChunk {
-    pub const LEN: usize = 8 + 4 + 4 + 8 + 8 + 4 + (4 + ID_CHUNK_BITMAP_SIZE) + 1; // Vec<u8>需要4字节长度前缀
-
     pub fn seeds(merchant_id: u32, chunk_index: u32) -> Vec<Vec<u8>> {
         vec![
             b"id_chunk".to_vec(),

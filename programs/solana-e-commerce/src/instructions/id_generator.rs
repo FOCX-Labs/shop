@@ -88,7 +88,7 @@ pub struct AllocateChunk<'info> {
     #[account(
         init,
         payer = payer,
-        space = IdChunk::LEN,
+        space = 8 + IdChunk::INIT_SPACE,
         seeds = [
             b"id_chunk",
             merchant.key().as_ref(),

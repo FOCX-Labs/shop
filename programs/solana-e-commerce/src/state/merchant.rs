@@ -2,9 +2,12 @@ use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 
 #[account]
+#[derive(InitSpace)]
 pub struct Merchant {
     pub owner: Pubkey,
+    #[max_len(100)]
     pub name: String,
+    #[max_len(500)]
     pub description: String,
     pub product_count: u64,
     pub total_sales: u64,
@@ -20,21 +23,6 @@ pub struct Merchant {
 }
 
 impl Merchant {
-    pub const LEN: usize = 8
-        + 32  // owner
-        + (4 + super::MAX_MERCHANT_NAME_LENGTH)  // name
-        + (4 + super::MAX_MERCHANT_DESCRIPTION_LENGTH)  // description
-        + 8   // product_count
-        + 8   // total_sales
-        + 1   // is_active
-        + 8   // created_at
-        + 8   // updated_at
-        + 8   // deposit_amount
-        + 32  // deposit_token_mint
-        + 8   // deposit_locked
-        + 8   // deposit_updated_at
-        + 1; // bump
-
     pub fn seeds(owner: &Pubkey) -> Vec<Vec<u8>> {
         vec![b"merchant_info".to_vec(), owner.as_ref().to_vec()]
     }

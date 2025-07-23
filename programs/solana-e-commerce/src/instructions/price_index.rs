@@ -2,8 +2,6 @@ use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
-
-
 #[derive(Accounts)]
 #[instruction(product_id: u64)]
 pub struct RemoveProductFromPriceIndex<'info> {
@@ -46,7 +44,7 @@ pub struct SplitPriceNode<'info> {
     #[account(
         init,
         payer = payer,
-        space = PriceIndexNode::LEN,
+        space = 8 + PriceIndexNode::INIT_SPACE,
         seeds = [
             b"price_index",
             ((price_range_start + price_range_end) / 2 + 1).to_le_bytes().as_ref(),
@@ -61,8 +59,6 @@ pub struct SplitPriceNode<'info> {
 
     pub system_program: Program<'info, System>,
 }
-
-
 
 pub fn remove_product_from_price_index(
     ctx: Context<RemoveProductFromPriceIndex>,
@@ -197,7 +193,7 @@ pub struct InitializePriceIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = PriceIndexNode::LEN,
+        space = 8 + PriceIndexNode::INIT_SPACE,
         seeds = [
             b"price_index",
             price_range_start.to_le_bytes().as_ref(),
@@ -249,7 +245,7 @@ pub struct AddProductToPriceIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = PriceIndexNode::LEN,
+        space = 8 + PriceIndexNode::INIT_SPACE,
         seeds = [
             b"price_index",
             price_range_start.to_le_bytes().as_ref(),

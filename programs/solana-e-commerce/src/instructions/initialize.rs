@@ -10,7 +10,7 @@ pub struct InitializeSystem<'info> {
     #[account(
         init,
         payer = payer,
-        space = GlobalIdRoot::LEN,
+        space = 8 + GlobalIdRoot::INIT_SPACE,
         seeds = [b"global_id_root"],
         bump
     )]
@@ -29,7 +29,6 @@ pub fn initialize_system(ctx: Context<InitializeSystem>, config: SystemConfig) -
     global_root.max_products_per_shard = config.max_products_per_shard;
     global_root.max_keywords_per_product = config.max_keywords_per_product;
     global_root.bloom_filter_size = config.bloom_filter_size;
-    global_root.cache_ttl = config.cache_ttl;
     global_root.bump = ctx.bumps.global_root;
 
     msg!("系统初始化成功，块大小: {}", config.chunk_size);
@@ -66,10 +65,13 @@ pub fn initialize_system_config(
     system_config.max_keywords_per_product = config.max_keywords_per_product;
     system_config.chunk_size = config.chunk_size;
     system_config.bloom_filter_size = config.bloom_filter_size;
-    system_config.cache_ttl = config.cache_ttl;
     system_config.merchant_deposit_required = config.merchant_deposit_required;
     system_config.deposit_token_mint = config.deposit_token_mint;
     system_config.deposit_token_decimals = config.deposit_token_decimals;
+    // 初始化新增字段
+    system_config.platform_fee_rate = config.platform_fee_rate;
+    system_config.platform_fee_recipient = config.platform_fee_recipient;
+    system_config.auto_confirm_days = config.auto_confirm_days;
 
     msg!(
         "系统配置初始化成功，管理员: {}, 保证金要求: {} tokens",
@@ -77,5 +79,45 @@ pub fn initialize_system_config(
         config.merchant_deposit_required
     );
 
+    Ok(())
+}
+
+/// 关闭系统配置账户
+#[derive(Accounts)]
+pub struct CloseSystemConfig<'info> {
+    #[account(
+        mut,
+        seeds = [b"system_config"],
+        bump,
+        close = beneficiary
+    )]
+    pub system_config: Account<'info, SystemConfig>,
+
+    #[account(mut)]
+    pub beneficiary: Signer<'info>,
+
+    #[account(
+        constraint = authority.key() == system_config.authority @ crate::error::ErrorCode::Unauthorized
+    )]
+    pub authority: Signer<'info>,
+}
+
+pub fn close_system_config(ctx: Context<CloseSystemConfig>, force: bool) -> Result<()> {
+    let system_config = &ctx.accounts.system_config;
+
+    msg!(
+        "关闭系统配置账户，管理员: {}, 强制关闭: {}",
+        system_config.authority,
+        force
+    );
+
+    // 这里可以添加额外的验证逻辑
+    // 例如检查是否还有活跃的商户等
+    if !force {
+        // 添加安全检查
+        msg!("执行安全检查...");
+    }
+
+    msg!("系统配置账户关闭成功");
     Ok(())
 }

@@ -5,10 +5,11 @@ pub mod instructions;
 pub mod state;
 pub mod utils;
 
+use instructions::order::{ApproveRefund, RequestRefund};
 use instructions::*;
 use state::{OrderManagementStatus, SupportedToken};
 
-declare_id!("5y3FcQs2Ar6kTqpsJpJdHRJih3G9WDtsmkiNX54UtPiq");
+declare_id!("mo5xPstZDm27CAkcyoTJnEovMYcW45tViAU6PZikv5q");
 
 #[program]
 pub mod solana_e_commerce {
@@ -25,6 +26,11 @@ pub mod solana_e_commerce {
         config: SystemConfig,
     ) -> Result<()> {
         instructions::initialize::initialize_system_config(ctx, config)
+    }
+
+    // 关闭系统配置
+    pub fn close_system_config(ctx: Context<CloseSystemConfig>, force: bool) -> Result<()> {
+        instructions::initialize::close_system_config(ctx, force)
     }
 
     // ID生成器指令
@@ -55,10 +61,6 @@ pub mod solana_e_commerce {
         instructions::merchant::register_merchant_atomic(ctx, name, description)
     }
 
-
-
-
-
     pub fn update_merchant_info(
         ctx: Context<UpdateMerchant>,
         name: Option<String>,
@@ -73,37 +75,76 @@ pub mod solana_e_commerce {
 
     // 商品管理指令
 
-    // 原子化商品创建（单指令完成商品创建和索引更新）
-    pub fn create_product_atomic(
-        ctx: Context<CreateProductAtomic>,
+    // 创建ProductBase（核心业务数据）
+    pub fn create_product_base(
+        ctx: Context<CreateProductBase>,
         name: String,
         description: String,
         price: u64,
         keywords: Vec<String>,
+        inventory: u64,
         payment_token: Pubkey,
-        token_decimals: u8,
-        token_price: u64,
+        shipping_location: String,
     ) -> Result<u64> {
-        instructions::product::create_product_atomic(
+        instructions::product::create_product_base(
             ctx,
             name,
             description,
             price,
             keywords,
+            inventory,
             payment_token,
-            token_decimals,
-            token_price,
+            shipping_location,
         )
     }
 
-    // 产品修改指令 - 暂时注释掉，因为相关结构体已被删除
-    // pub fn update_product(
-    //     ctx: Context<UpdateProduct>,
-    //     product_id: u64,
-    //     params: ProductUpdateParams,
-    // ) -> Result<()> {
-    //     instructions::product::update_product(ctx, product_id, params)
-    // }
+    // 创建ProductExtended（扩展营销数据）
+    pub fn create_product_extended(
+        ctx: Context<CreateProductExtended>,
+        product_id: u64,
+        image_video_urls: Vec<String>,
+        sales_regions: Vec<String>,
+        logistics_methods: Vec<String>,
+    ) -> Result<()> {
+        instructions::product::create_product_extended(
+            ctx,
+            product_id,
+            image_video_urls,
+            sales_regions,
+            logistics_methods,
+        )
+    }
+
+    // 产品修改指令
+    pub fn update_product(
+        ctx: Context<UpdateProduct>,
+        product_id: u64,
+        name: Option<String>,
+        description: Option<String>,
+        price: Option<u64>,
+        keywords: Option<Vec<String>>,
+        inventory: Option<u64>,
+        payment_token: Option<Pubkey>,
+        image_video_urls: Option<Vec<String>>,
+        shipping_location: Option<String>,
+        sales_regions: Option<Vec<String>>,
+        logistics_methods: Option<Vec<String>>,
+    ) -> Result<()> {
+        instructions::product::update_product(
+            ctx,
+            product_id,
+            name,
+            description,
+            price,
+            keywords,
+            inventory,
+            payment_token,
+            image_video_urls,
+            shipping_location,
+            sales_regions,
+            logistics_methods,
+        )
+    }
 
     pub fn delete_product(
         ctx: Context<DeleteProduct>,
@@ -118,9 +159,8 @@ pub mod solana_e_commerce {
         ctx: Context<UpdateProductPrice>,
         product_id: u64,
         new_price: u64,
-        new_token_price: u64,
     ) -> Result<()> {
-        instructions::product::update_product_price(ctx, product_id, new_price, new_token_price)
+        instructions::product::update_product_price(ctx, product_id, new_price)
     }
 
     pub fn update_sales_count(
@@ -161,8 +201,6 @@ pub mod solana_e_commerce {
         instructions::payment::close_payment_config(ctx, force)
     }
 
-
-
     // 托管购买商品指令 - 集成订单创建
     pub fn purchase_product_escrow(
         ctx: Context<PurchaseProductEscrow>,
@@ -192,20 +230,22 @@ pub mod solana_e_commerce {
         instructions::keyword_index::remove_product_from_keyword_index(ctx, keyword, product_id)
     }
 
-    // init_if_needed 版本的关键词索引指令
-    pub fn initialize_keyword_index_if_needed(
+    // 关键词索引指令
+    pub fn initialize_keyword_index(
         ctx: Context<InitializeKeywordIndexIfNeeded>,
         keyword: String,
     ) -> Result<()> {
         instructions::keyword_index::initialize_keyword_index_if_needed(ctx, keyword)
     }
 
-    pub fn add_product_to_keyword_index_if_needed(
+    pub fn add_product_to_keyword_index(
         ctx: Context<AddProductToKeywordIndexIfNeeded>,
         keyword: String,
         product_id: u64,
     ) -> Result<()> {
-        instructions::keyword_index::add_product_to_keyword_index_if_needed(ctx, keyword, product_id)
+        instructions::keyword_index::add_product_to_keyword_index_if_needed(
+            ctx, keyword, product_id,
+        )
     }
 
     pub fn create_keyword_shard(
@@ -216,25 +256,33 @@ pub mod solana_e_commerce {
         instructions::keyword_index::create_keyword_shard(ctx, keyword, shard_index)
     }
 
-    // 价格索引管理指令（已删除老旧函数，只保留if_needed版本）
-
-    // init_if_needed 版本的价格索引指令
-    pub fn initialize_price_index_if_needed(
+    // 价格索引管理指令
+    pub fn initialize_price_index(
         ctx: Context<InitializePriceIndexIfNeeded>,
         price_range_start: u64,
         price_range_end: u64,
     ) -> Result<()> {
-        instructions::price_index::initialize_price_index_if_needed(ctx, price_range_start, price_range_end)
+        instructions::price_index::initialize_price_index_if_needed(
+            ctx,
+            price_range_start,
+            price_range_end,
+        )
     }
 
-    pub fn add_product_to_price_index_if_needed(
+    pub fn add_product_to_price_index(
         ctx: Context<AddProductToPriceIndexIfNeeded>,
         price_range_start: u64,
         price_range_end: u64,
         product_id: u64,
         price: u64,
     ) -> Result<()> {
-        instructions::price_index::add_product_to_price_index_if_needed(ctx, price_range_start, price_range_end, product_id, price)
+        instructions::price_index::add_product_to_price_index_if_needed(
+            ctx,
+            price_range_start,
+            price_range_end,
+            product_id,
+            price,
+        )
     }
 
     pub fn remove_product_from_price_index(
@@ -252,25 +300,33 @@ pub mod solana_e_commerce {
         instructions::price_index::split_price_node(ctx, price_range_start, price_range_end)
     }
 
-    // 销量索引管理指令（已删除老旧函数，只保留if_needed版本）
-
-    // init_if_needed 版本的销量索引指令
-    pub fn initialize_sales_index_if_needed(
+    // 销量索引管理指令
+    pub fn initialize_sales_index(
         ctx: Context<InitializeSalesIndexIfNeeded>,
         sales_range_start: u32,
         sales_range_end: u32,
     ) -> Result<()> {
-        instructions::sales_index::initialize_sales_index_if_needed(ctx, sales_range_start, sales_range_end)
+        instructions::sales_index::initialize_sales_index_if_needed(
+            ctx,
+            sales_range_start,
+            sales_range_end,
+        )
     }
 
-    pub fn add_product_to_sales_index_if_needed(
+    pub fn add_product_to_sales_index(
         ctx: Context<AddProductToSalesIndexIfNeeded>,
         sales_range_start: u32,
         sales_range_end: u32,
         product_id: u64,
         sales: u32,
     ) -> Result<()> {
-        instructions::sales_index::add_product_to_sales_index_if_needed(ctx, sales_range_start, sales_range_end, product_id, sales)
+        instructions::sales_index::add_product_to_sales_index_if_needed(
+            ctx,
+            sales_range_start,
+            sales_range_end,
+            product_id,
+            sales,
+        )
     }
 
     pub fn remove_product_from_sales_index(
@@ -354,37 +410,27 @@ pub mod solana_e_commerce {
 
     pub fn update_order_status(
         ctx: Context<UpdateOrderStatus>,
-        buyer: Pubkey,
-        merchant: Pubkey,
-        product_id: u64,
-        timestamp: i64,
         new_status: OrderManagementStatus,
     ) -> Result<()> {
-        instructions::order::update_order_status(ctx, buyer, merchant, product_id, timestamp, new_status)
+        instructions::order::update_order_status(ctx, new_status)
     }
 
-    pub fn refund_order(
-        ctx: Context<RefundOrder>,
-        buyer: Pubkey,
-        merchant_key: Pubkey,
-        product_id: u64,
-        timestamp: i64
-    ) -> Result<()> {
-        instructions::order::refund_order(ctx, buyer, merchant_key, product_id, timestamp)
+    // 买家请求退款
+    pub fn request_refund(ctx: Context<RequestRefund>, refund_reason: String) -> Result<()> {
+        instructions::order::request_refund(ctx, refund_reason)
+    }
+
+    // 商家批准退款并执行退款
+    pub fn approve_refund(ctx: Context<ApproveRefund>) -> Result<()> {
+        instructions::order::approve_refund(ctx)
     }
 
     pub fn get_order_stats(ctx: Context<GetOrderStats>) -> Result<()> {
         instructions::order::get_order_stats(ctx)
     }
 
-    pub fn confirm_delivery(
-        ctx: Context<ConfirmDelivery>,
-        buyer_key: Pubkey,
-        merchant: Pubkey,
-        product_id: u64,
-        timestamp: i64
-    ) -> Result<()> {
-        instructions::order::confirm_delivery(ctx, buyer_key, merchant, product_id, timestamp)
+    pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
+        instructions::order::confirm_delivery(ctx)
     }
 
     pub fn return_order(
@@ -395,7 +441,14 @@ pub mod solana_e_commerce {
         timestamp: i64,
         return_reason: Option<String>,
     ) -> Result<()> {
-        instructions::order::return_order(ctx, buyer, merchant_key, product_id, timestamp, return_reason)
+        instructions::order::return_order(
+            ctx,
+            buyer,
+            merchant_key,
+            product_id,
+            timestamp,
+            return_reason,
+        )
     }
 
     // ==================== 保证金管理指令 ====================
@@ -434,31 +487,39 @@ pub mod solana_e_commerce {
 
 #[account]
 pub struct SystemConfig {
-    pub authority: Pubkey,              // 系统管理员地址
+    pub authority: Pubkey, // 系统管理员地址
     pub max_products_per_shard: u16,
     pub max_keywords_per_product: u8,
     pub chunk_size: u32,
     pub bloom_filter_size: u16,
-    pub cache_ttl: u32,
     // 保证金配置
     pub merchant_deposit_required: u64, // 商户保证金要求（USDC，以最小单位计算）
     pub deposit_token_mint: Pubkey,     // 保证金代币mint地址（USDC）
     pub deposit_token_decimals: u8,     // 保证金代币精度
+    // 新增平台手续费配置
+    pub platform_fee_rate: u16, // 平台手续费率（基点，默认40 = 0.4%）
+    pub platform_fee_recipient: Pubkey, // 平台手续费接收账户
+    // 新增自动确认收货配置
+    pub auto_confirm_days: u32, // 自动确认收货天数（默认30天）
 }
 
 impl Default for SystemConfig {
     fn default() -> Self {
         Self {
-            authority: Pubkey::default(),                // 需要在初始化时设置
+            authority: Pubkey::default(), // 需要在初始化时设置
             max_products_per_shard: 100,
             max_keywords_per_product: 10,
             chunk_size: 10_000,
             bloom_filter_size: 256,
-            cache_ttl: 3600,
             // 默认保证金配置：1000 USDC (6位精度)
             merchant_deposit_required: 1000 * 1_000_000, // 1000 USDC
             deposit_token_mint: Pubkey::default(),       // 需要在初始化时设置
             deposit_token_decimals: 6,                   // USDC精度
+            // 默认平台手续费配置
+            platform_fee_rate: 40,                     // 0.4% (40基点)
+            platform_fee_recipient: Pubkey::default(), // 需要在初始化时设置
+            // 默认自动确认收货配置
+            auto_confirm_days: 30, // 30天自动确认收货
         }
     }
 }

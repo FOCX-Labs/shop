@@ -2,8 +2,6 @@ use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
-
-
 #[derive(Accounts)]
 #[instruction(product_id: u64, old_sales: u32, new_sales: u32)]
 pub struct UpdateProductSalesIndex<'info> {
@@ -49,8 +47,6 @@ pub struct GetTopSellingProducts<'info> {
     #[account()]
     pub sales_root: AccountInfo<'info>,
 }
-
-
 
 pub fn update_product_sales_index(
     ctx: Context<UpdateProductSalesIndex>,
@@ -283,7 +279,7 @@ pub struct InitializeSalesIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = SalesIndexNode::LEN,
+        space = 8 + SalesIndexNode::INIT_SPACE,
         seeds = [
             b"sales_index",
             sales_range_start.to_le_bytes().as_ref(),
@@ -336,7 +332,7 @@ pub struct AddProductToSalesIndexIfNeeded<'info> {
     #[account(
         init_if_needed,
         payer = payer,
-        space = SalesIndexNode::LEN,
+        space = 8 + SalesIndexNode::INIT_SPACE,
         seeds = [
             b"sales_index",
             sales_range_start.to_le_bytes().as_ref(),
@@ -421,6 +417,9 @@ fn update_top_sales_items(
     // 添加新产品到热销列表
     top_items.push(ProductSales {
         product_id,
+        merchant: Pubkey::default(), // TODO: 从产品账户获取实际商户信息
+        name: String::new(),         // TODO: 从产品账户获取实际产品名称
+        price: 0,                    // TODO: 从产品账户获取实际价格
         sales,
         last_update: Clock::get()?.unix_timestamp,
     });

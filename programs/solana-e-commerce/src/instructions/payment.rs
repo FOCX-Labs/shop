@@ -9,7 +9,7 @@ pub struct InitializePaymentSystem<'info> {
     #[account(
         init,
         payer = authority,
-        space = PaymentConfig::LEN,
+        space = 8 + PaymentConfig::INIT_SPACE,
         seeds = [b"payment_config"],
         bump
     )]
@@ -117,10 +117,6 @@ pub fn close_payment_config(ctx: Context<ClosePaymentConfig>, force: bool) -> Re
     Ok(())
 }
 
-
-
-
-
 /// 托管购买商品（新的托管支付系统）- 集成订单创建
 #[derive(Accounts)]
 #[instruction(product_id: u64, amount: u64, timestamp: i64)]
@@ -129,10 +125,22 @@ pub struct PurchaseProductEscrow<'info> {
     pub buyer: Signer<'info>,
 
     #[account(
+        init_if_needed,
+        payer = buyer,
+        space = 8 + UserPurchaseCount::INIT_SPACE,
+        seeds = [
+            b"user_purchase_count",
+            buyer.key().as_ref()
+        ],
+        bump
+    )]
+    pub user_purchase_count: Account<'info, UserPurchaseCount>,
+
+    #[account(
         seeds = [b"product", product_id.to_le_bytes().as_ref()],
         bump
     )]
-    pub product: Account<'info, Product>,
+    pub product: Account<'info, ProductBase>,
 
     #[account(
         seeds = [b"payment_config"],
@@ -144,7 +152,7 @@ pub struct PurchaseProductEscrow<'info> {
     #[account(
         init,
         payer = buyer,
-        space = EscrowAccount::LEN,
+        space = 8 + EscrowAccount::INIT_SPACE,
         seeds = [b"escrow", buyer.key().as_ref(), product_id.to_le_bytes().as_ref()],
         bump
     )]
@@ -154,13 +162,13 @@ pub struct PurchaseProductEscrow<'info> {
     #[account(
         init,
         payer = buyer,
-        space = Order::LEN,
+        space = 8 + Order::INIT_SPACE,
         seeds = [
             b"order",
             buyer.key().as_ref(),
             product.merchant.as_ref(),
             product_id.to_le_bytes().as_ref(),
-            timestamp.to_le_bytes().as_ref()
+            user_purchase_count.purchase_count.to_le_bytes().as_ref()
         ],
         bump
     )]
@@ -215,7 +223,7 @@ pub fn purchase_product_escrow(
     ctx: Context<PurchaseProductEscrow>,
     product_id: u64,
     amount: u64,
-    timestamp: i64,
+    _timestamp: i64,
     shipping_address: String,
     notes: String,
 ) -> Result<()> {
@@ -225,6 +233,7 @@ pub fn purchase_product_escrow(
     let order = &mut ctx.accounts.order;
     let order_stats = &mut ctx.accounts.order_stats;
     let merchant = &ctx.accounts.merchant;
+    let user_purchase_count = &mut ctx.accounts.user_purchase_count;
 
     // 验证商品是否激活
     require!(product.is_active, ErrorCode::InvalidProduct);
@@ -246,20 +255,10 @@ pub fn purchase_product_escrow(
         ErrorCode::MerchantDepositInsufficient
     );
 
-    // 确定支付方式和价格 - 只支持SPL代币
+    // 确定支付方式和价格 - 商品创建时已验证代币支持
     let payment_token = product.payment_token;
-    require!(
-        payment_config.is_token_supported(&payment_token),
-        ErrorCode::UnsupportedToken
-    );
 
-    let token_info = payment_config
-        .get_token_info(&payment_token)
-        .ok_or(ErrorCode::UnsupportedToken)?;
-
-    token_info.validate_amount(product.token_price.saturating_mul(amount))?;
-
-    let total_price = product.token_price.saturating_mul(amount);
+    let total_price = product.price.saturating_mul(amount);
 
     // 计算手续费
     let fee_amount = total_price
@@ -268,10 +267,18 @@ pub fn purchase_product_escrow(
 
     let current_time = Clock::get()?.unix_timestamp;
 
+    // 初始化或更新用户购买计数
+    if user_purchase_count.buyer == Pubkey::default() {
+        user_purchase_count.initialize(ctx.accounts.buyer.key(), ctx.bumps.user_purchase_count)?;
+    }
+
+    // 增加购买计数
+    let purchase_count = user_purchase_count.increment_count()?;
+
     // 初始化托管账户
     let bump = ctx.bumps.escrow_account;
     escrow_account.initialize(
-        timestamp as u64, // 使用timestamp作为订单ID
+        purchase_count, // 使用购买计数作为订单ID
         ctx.accounts.buyer.key(),
         product.merchant,
         product_id,
@@ -282,18 +289,14 @@ pub fn purchase_product_escrow(
         bump,
     )?;
 
-    // 创建订单记录 - 新增逻辑
-    order.id = timestamp as u64;
+    // 创建订单记录 - 新增逻辑（移除id字段）
     order.buyer = ctx.accounts.buyer.key();
     order.merchant = merchant.owner;
     order.product_id = product_id;
     order.quantity = amount as u32;
-    order.unit_price = product.price;
-    order.total_amount = product.price.checked_mul(amount).unwrap();
+    order.price = product.price;
+    order.total_amount = total_price;
     order.payment_token = product.payment_token;
-    order.token_decimals = product.token_decimals;
-    order.token_unit_price = product.token_price;
-    order.token_total_amount = total_price;
     order.status = OrderManagementStatus::Pending;
     order.shipping_address = shipping_address;
     order.notes = notes;
@@ -303,6 +306,8 @@ pub fn purchase_product_escrow(
     order.shipped_at = None;
     order.delivered_at = None;
     order.refunded_at = None;
+    order.refund_requested_at = None;
+    order.refund_reason = String::new();
     order.transaction_signature = "".to_string(); // 将在客户端设置
     order.bump = ctx.bumps.order;
 
@@ -331,7 +336,7 @@ pub fn purchase_product_escrow(
         product_id,
         amount,
         total_price,
-        timestamp
+        purchase_count
     );
 
     Ok(())

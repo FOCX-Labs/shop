@@ -2,10 +2,13 @@ use super::ProductSales;
 use anchor_lang::prelude::*;
 
 #[account]
+#[derive(InitSpace)]
 pub struct SalesIndexNode {
     pub sales_range_start: u32,
     pub sales_range_end: u32,
+    #[max_len(500)]
     pub product_ids: Vec<u64>,
+    #[max_len(10)]
     pub top_items: Vec<ProductSales>, // 缓存热销商品
     pub left_child: Option<Pubkey>,
     pub right_child: Option<Pubkey>,
@@ -15,17 +18,6 @@ pub struct SalesIndexNode {
 }
 
 impl SalesIndexNode {
-    pub const LEN: usize = 8
-        + 4
-        + 4
-        + (4 + super::MAX_PRODUCTS_PER_SHARD * 8)
-        + (4 + 20 * (8 + 4 + 8))
-        + 33
-        + 33
-        + 33
-        + 1
-        + 1;
-
     pub fn seeds(sales_range_start: u32, sales_range_end: u32) -> Vec<Vec<u8>> {
         vec![
             b"sales_index".to_vec(),
@@ -88,6 +80,9 @@ impl SalesIndexNode {
         let now = Clock::get()?.unix_timestamp;
         let product_sales = ProductSales {
             product_id,
+            merchant: Pubkey::default(), // TODO: 从产品账户获取实际商户信息
+            name: String::new(),         // TODO: 从产品账户获取实际产品名称
+            price: 0,                    // TODO: 从产品账户获取实际价格
             sales,
             last_update: now,
         };

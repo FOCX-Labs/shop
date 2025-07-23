@@ -2,7 +2,9 @@ use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 
 #[account]
+#[derive(InitSpace)]
 pub struct KeywordRoot {
+    #[max_len(128)]
     pub keyword: String,
     pub total_shards: u8,
     pub first_shard: Pubkey,
@@ -13,8 +15,6 @@ pub struct KeywordRoot {
 }
 
 impl KeywordRoot {
-    pub const LEN: usize = 8 + (4 + 128) + 1 + 32 + 32 + 4 + super::BLOOM_FILTER_SIZE + 1;
-
     pub fn seeds(keyword: &str) -> Vec<Vec<u8>> {
         vec![b"keyword_root".to_vec(), keyword.as_bytes().to_vec()]
     }
@@ -79,11 +79,14 @@ impl KeywordRoot {
 }
 
 #[account]
+#[derive(InitSpace)]
 pub struct KeywordShard {
+    #[max_len(128)]
     pub keyword: String,
     pub shard_index: u32,
     pub prev_shard: Pubkey,
     pub next_shard: Option<Pubkey>,
+    #[max_len(1000)]
     pub product_ids: Vec<u64>,
     pub min_id: u64,
     pub max_id: u64,
@@ -92,17 +95,6 @@ pub struct KeywordShard {
 }
 
 impl KeywordShard {
-    pub const LEN: usize = 8
-        + (4 + 128)
-        + 4
-        + 32
-        + 33
-        + (4 + super::MAX_PRODUCTS_PER_SHARD * 8)
-        + 8
-        + 8
-        + super::BLOOM_SUMMARY_SIZE
-        + 1;
-
     pub fn seeds(keyword: &str, shard_index: u32) -> Vec<Vec<u8>> {
         vec![
             b"keyword_shard".to_vec(),

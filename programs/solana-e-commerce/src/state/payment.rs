@@ -3,19 +3,19 @@ use anchor_lang::prelude::*;
 
 /// 系统级支付配置账户
 #[account]
+#[derive(InitSpace)]
 pub struct PaymentConfig {
-    pub authority: Pubkey,                     // 系统管理员
+    pub authority: Pubkey, // 系统管理员
+    #[max_len(10)]
     pub supported_tokens: Vec<SupportedToken>, // 支持的代币列表
-    pub fee_rate: u16,                         // 手续费率（基点，如100=1%）
-    pub fee_recipient: Pubkey,                 // 手续费接收方
+    pub fee_rate: u16,     // 手续费率（基点，如100=1%）
+    pub fee_recipient: Pubkey, // 手续费接收方
     pub created_at: i64,
     pub updated_at: i64,
     pub bump: u8,
 }
 
 impl PaymentConfig {
-    pub const LEN: usize = 8 + 32 + (4 + 10 * SupportedToken::LEN) + 2 + 32 + 8 + 8 + 1;
-
     pub fn seeds() -> &'static [&'static [u8]] {
         &[b"payment_config"]
     }
@@ -70,18 +70,17 @@ impl PaymentConfig {
 }
 
 /// 支持的代币信息
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug, InitSpace)]
 pub struct SupportedToken {
-    pub mint: Pubkey,    // 代币mint地址
-    pub symbol: String,  // 代币符号（如"USDC"）
-    pub decimals: u8,    // 代币精度
+    pub mint: Pubkey, // 代币mint地址
+    #[max_len(10)]
+    pub symbol: String, // 代币符号（如"USDC"）
+    pub decimals: u8, // 代币精度
     pub is_active: bool, // 是否启用
     pub min_amount: u64, // 最小交易金额
 }
 
 impl SupportedToken {
-    pub const LEN: usize = 32 + (4 + 10) + 1 + 1 + 8; // 预留10字符的符号
-
     pub fn new(mint: Pubkey, symbol: String, decimals: u8, min_amount: u64) -> Result<Self> {
         require!(symbol.len() <= 10, ErrorCode::InvalidTokenSymbol);
         require!(decimals <= 18, ErrorCode::InvalidTokenDecimals);
@@ -101,10 +100,8 @@ impl SupportedToken {
     }
 }
 
-
-
 /// 订单状态枚举
-#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Debug)]
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Debug, InitSpace)]
 pub enum OrderStatus {
     Pending,
     PendingConfirmation, // 待确认收货（托管支付状态）
@@ -115,6 +112,7 @@ pub enum OrderStatus {
 
 /// 托管账户结构
 #[account]
+#[derive(InitSpace)]
 pub struct EscrowAccount {
     pub order_id: u64,         // 订单ID（使用product_id + buyer的组合）
     pub buyer: Pubkey,         // 买家地址
@@ -131,8 +129,6 @@ pub struct EscrowAccount {
 }
 
 impl EscrowAccount {
-    pub const LEN: usize = 8 + 8 + 32 + 32 + 8 + 32 + 8 + 8 + 8 + 8 + 1 + 8 + 1;
-
     pub fn seeds(buyer: &Pubkey, product_id: u64) -> Vec<Vec<u8>> {
         vec![
             b"escrow".to_vec(),

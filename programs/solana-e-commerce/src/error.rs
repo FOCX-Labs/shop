@@ -25,6 +25,8 @@ pub enum ErrorCode {
     NoAvailableId,
     #[msg("无效的ID")]
     InvalidId,
+    #[msg("整数溢出")]
+    IntegerOverflow,
 
     // 商品相关错误
     #[msg("商品不存在")]
@@ -35,10 +37,20 @@ pub enum ErrorCode {
     InvalidProductAccount,
     #[msg("无效的价格")]
     InvalidPrice,
+    #[msg("无效的商品名称")]
+    InvalidProductName,
     #[msg("无效的商品名称长度")]
     InvalidProductNameLength,
+    #[msg("无效的商品描述")]
+    InvalidProductDescription,
     #[msg("无效的商品描述长度")]
     InvalidProductDescriptionLength,
+    #[msg("图片URL数量过多")]
+    TooManyImageUrls,
+    #[msg("销售区域数量过多")]
+    TooManySalesRegions,
+    #[msg("物流方式数量过多")]
+    TooManyLogisticsMethods,
 
     // 商户相关错误
     #[msg("无效的商户")]

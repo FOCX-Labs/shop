@@ -1,7 +1,5 @@
 use crate::error::ErrorCode;
-use crate::state::{
-    GlobalIdRoot, IdChunk, Merchant, MerchantIdAccount, MerchantStats,
-};
+use crate::state::{GlobalIdRoot, IdChunk, Merchant, MerchantIdAccount, MerchantStats};
 use anchor_lang::prelude::*;
 // 移除未使用的token导入，因为保证金管理已统一到deposit.rs模块
 
@@ -11,7 +9,7 @@ pub struct InitializeMerchant<'info> {
     #[account(
         init,
         payer = payer,
-        space = Merchant::LEN,
+        space = 8 + Merchant::INIT_SPACE,
         seeds = [b"merchant_info", owner.key().as_ref()],
         bump
     )]
@@ -31,8 +29,6 @@ pub struct InitializeMerchant<'info> {
 
     pub system_program: Program<'info, System>,
 }
-
-
 
 // 更新商户信息
 #[derive(Accounts)]
@@ -150,8 +146,6 @@ pub struct MerchantRegisteredAtomic {
     pub initial_id_range_end: u64,
 }
 
-
-
 // ==================== 完整商户注册功能（包含ID块分配） ====================
 
 /// 原子性商户注册账户结构（包含ID块分配）
@@ -174,7 +168,7 @@ pub struct RegisterMerchantAtomic<'info> {
     #[account(
         init,
         payer = payer,
-        space = Merchant::LEN,
+        space = 8 + Merchant::INIT_SPACE,
         seeds = [b"merchant_info", merchant.key().as_ref()],
         bump
     )]
@@ -189,7 +183,7 @@ pub struct RegisterMerchantAtomic<'info> {
     #[account(
         init,
         payer = payer,
-        space = MerchantIdAccount::LEN,
+        space = 8 + MerchantIdAccount::INIT_SPACE,
         seeds = [b"merchant_id", merchant.key().as_ref()],
         bump
     )]
@@ -198,7 +192,7 @@ pub struct RegisterMerchantAtomic<'info> {
     #[account(
         init,
         payer = payer,
-        space = IdChunk::LEN,
+        space = 8 + IdChunk::INIT_SPACE,
         seeds = [
             b"id_chunk",
             merchant.key().as_ref(),
@@ -285,11 +279,3 @@ pub fn register_merchant_atomic(
 
     Ok(())
 }
-
-
-
-
-
-
-
-
