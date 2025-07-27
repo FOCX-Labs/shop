@@ -117,95 +117,37 @@ pub fn close_payment_config(ctx: Context<ClosePaymentConfig>, force: bool) -> Re
     Ok(())
 }
 
-/// 托管购买商品（新的托管支付系统）- 集成订单创建
+/// 简化的购买商品指令
 #[derive(Accounts)]
-#[instruction(product_id: u64, amount: u64, timestamp: i64)]
+#[instruction(product_id: u64, amount: u64)]
 pub struct PurchaseProductEscrow<'info> {
     #[account(mut)]
     pub buyer: Signer<'info>,
 
-    #[account(
-        init_if_needed,
-        payer = buyer,
-        space = 8 + UserPurchaseCount::INIT_SPACE,
-        seeds = [
-            b"user_purchase_count",
-            buyer.key().as_ref()
-        ],
-        bump
-    )]
-    pub user_purchase_count: Account<'info, UserPurchaseCount>,
-
+    // 产品账户 - 验证产品存在和价格
     #[account(
         seeds = [b"product", product_id.to_le_bytes().as_ref()],
         bump
     )]
     pub product: Account<'info, ProductBase>,
 
+    // 主程序统一托管代币账户
     #[account(
-        seeds = [b"payment_config"],
-        bump
-    )]
-    pub payment_config: Account<'info, PaymentConfig>,
-
-    // 托管账户
-    #[account(
-        init,
-        payer = buyer,
-        space = 8 + EscrowAccount::INIT_SPACE,
-        seeds = [b"escrow", buyer.key().as_ref(), product_id.to_le_bytes().as_ref()],
-        bump
-    )]
-    pub escrow_account: Account<'info, EscrowAccount>,
-
-    // 订单账户 - 新增（使用复合种子）
-    #[account(
-        init,
-        payer = buyer,
-        space = 8 + Order::INIT_SPACE,
-        seeds = [
-            b"order",
-            buyer.key().as_ref(),
-            product.merchant.as_ref(),
-            product_id.to_le_bytes().as_ref(),
-            user_purchase_count.purchase_count.to_le_bytes().as_ref()
-        ],
-        bump
-    )]
-    pub order: Account<'info, Order>,
-
-    // 订单统计账户 - 新增
-    #[account(
-        mut,
-        seeds = [b"order_stats"],
-        bump
-    )]
-    pub order_stats: Account<'info, OrderStats>,
-
-    // 商户信息账户 - 新增
-    #[account(
-        seeds = [b"merchant_info", product.merchant.as_ref()],
-        bump
-    )]
-    pub merchant: Account<'info, Merchant>,
-
-    // 系统配置账户 - 用于保证金验证
-    #[account(
-        seeds = [b"system_config"],
-        bump
-    )]
-    pub system_config: Account<'info, crate::SystemConfig>,
-
-    // 托管代币账户（程序控制）
-    #[account(
-        init,
+        init_if_needed,
         payer = buyer,
         token::mint = payment_token_mint,
-        token::authority = escrow_account,
-        seeds = [b"escrow_token", buyer.key().as_ref(), product_id.to_le_bytes().as_ref()],
+        token::authority = program_authority,
+        seeds = [b"program_token_account"],
         bump
     )]
-    pub escrow_token_account: Account<'info, TokenAccount>,
+    pub program_token_account: Account<'info, TokenAccount>,
+
+    /// CHECK: 程序权限账户，用于控制Token转账
+    #[account(
+        seeds = [b"program_authority"],
+        bump
+    )]
+    pub program_authority: AccountInfo<'info>,
 
     // 买家代币账户
     #[account(mut)]
@@ -216,24 +158,14 @@ pub struct PurchaseProductEscrow<'info> {
 
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
-    pub rent: Sysvar<'info, Rent>,
 }
 
 pub fn purchase_product_escrow(
     ctx: Context<PurchaseProductEscrow>,
     product_id: u64,
     amount: u64,
-    _timestamp: i64,
-    shipping_address: String,
-    notes: String,
 ) -> Result<()> {
     let product = &ctx.accounts.product;
-    let payment_config = &ctx.accounts.payment_config;
-    let escrow_account = &mut ctx.accounts.escrow_account;
-    let order = &mut ctx.accounts.order;
-    let order_stats = &mut ctx.accounts.order_stats;
-    let merchant = &ctx.accounts.merchant;
-    let user_purchase_count = &mut ctx.accounts.user_purchase_count;
 
     // 验证商品是否激活
     require!(product.is_active, ErrorCode::InvalidProduct);
@@ -241,89 +173,22 @@ pub fn purchase_product_escrow(
     // 验证产品ID匹配
     require!(product.id == product_id, ErrorCode::InvalidProduct);
 
-    // 验证商户匹配
-    require!(
-        product.merchant == merchant.owner,
-        ErrorCode::InvalidMerchant
-    );
+    // 验证购买数量
+    require!(amount > 0, ErrorCode::InvalidAmount);
 
-    // 验证商户保证金是否满足要求
-    let system_config = &ctx.accounts.system_config;
-    let required_deposit = system_config.get_deposit_requirement();
-    require!(
-        merchant.has_sufficient_deposit(required_deposit),
-        ErrorCode::MerchantDepositInsufficient
-    );
+    // 计算总价格
+    let total_price = product
+        .price
+        .checked_mul(amount)
+        .ok_or(ErrorCode::IntegerOverflow)?;
 
-    // 确定支付方式和价格 - 商品创建时已验证代币支持
-    let payment_token = product.payment_token;
-
-    let total_price = product.price.saturating_mul(amount);
-
-    // 计算手续费
-    let fee_amount = total_price
-        .saturating_mul(payment_config.fee_rate as u64)
-        .saturating_div(10000);
-
-    let current_time = Clock::get()?.unix_timestamp;
-
-    // 初始化或更新用户购买计数
-    if user_purchase_count.buyer == Pubkey::default() {
-        user_purchase_count.initialize(ctx.accounts.buyer.key(), ctx.bumps.user_purchase_count)?;
-    }
-
-    // 增加购买计数
-    let purchase_count = user_purchase_count.increment_count()?;
-
-    // 初始化托管账户
-    let bump = ctx.bumps.escrow_account;
-    escrow_account.initialize(
-        purchase_count, // 使用购买计数作为订单ID
-        ctx.accounts.buyer.key(),
-        product.merchant,
-        product_id,
-        payment_token,
-        amount,
-        total_price,
-        fee_amount,
-        bump,
-    )?;
-
-    // 创建订单记录 - 新增逻辑（移除id字段）
-    order.buyer = ctx.accounts.buyer.key();
-    order.merchant = merchant.owner;
-    order.product_id = product_id;
-    order.quantity = amount as u32;
-    order.price = product.price;
-    order.total_amount = total_price;
-    order.payment_token = product.payment_token;
-    order.status = OrderManagementStatus::Pending;
-    order.shipping_address = shipping_address;
-    order.notes = notes;
-    order.created_at = current_time;
-    order.updated_at = current_time;
-    order.confirmed_at = None;
-    order.shipped_at = None;
-    order.delivered_at = None;
-    order.refunded_at = None;
-    order.refund_requested_at = None;
-    order.refund_reason = String::new();
-    order.transaction_signature = "".to_string(); // 将在客户端设置
-    order.bump = ctx.bumps.order;
-
-    // 验证订单数据
-    order.validate()?;
-
-    // 更新订单统计
-    order_stats.update_for_new_order(order);
-
-    // 将买家的代币转入托管账户
+    // 将买家的代币转入主程序统一托管账户
     token::transfer(
         CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
             Transfer {
                 from: ctx.accounts.buyer_token_account.to_account_info(),
-                to: ctx.accounts.escrow_token_account.to_account_info(),
+                to: ctx.accounts.program_token_account.to_account_info(),
                 authority: ctx.accounts.buyer.to_account_info(),
             },
         ),
@@ -331,12 +196,11 @@ pub fn purchase_product_escrow(
     )?;
 
     msg!(
-        "原子性购买成功: 买家 {}, 商品 {}, 数量 {}, 总费用 {} tokens, 订单ID {}, 订单状态: 待确认收货",
+        "购买成功: 买家: {}, 产品ID: {}, 数量: {}, 总价: {} tokens",
         ctx.accounts.buyer.key(),
         product_id,
         amount,
-        total_price,
-        purchase_count
+        total_price
     );
 
     Ok(())

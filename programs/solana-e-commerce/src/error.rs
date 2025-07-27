@@ -37,6 +37,8 @@ pub enum ErrorCode {
     InvalidProductAccount,
     #[msg("无效的价格")]
     InvalidPrice,
+    #[msg("购买数量必须大于0")]
+    InvalidAmount,
     #[msg("无效的商品名称")]
     InvalidProductName,
     #[msg("无效的商品名称长度")]
@@ -207,4 +209,10 @@ pub enum ErrorCode {
     ArithmeticOverflow,
     #[msg("算术下溢")]
     ArithmeticUnderflow,
+
+    // 物流单号相关错误
+    #[msg("发货时必须提供物流单号")]
+    TrackingNumberRequired,
+    #[msg("无效的物流单号")]
+    InvalidTrackingNumber,
 }

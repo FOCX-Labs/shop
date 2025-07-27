@@ -3,12 +3,10 @@ use anchor_lang::prelude::*;
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq, Debug, InitSpace)]
 pub enum OrderManagementStatus {
-    Pending,         // 待处理
-    Confirmed,       // 已确认
-    Shipped,         // 已发货
-    RefundRequested, // 退款请求中
-    Delivered,       // 已送达
-    Refunded,        // 已退款
+    Pending,   // 待处理
+    Shipped,   // 已发货
+    Delivered, // 已送达
+    Refunded,  // 已退款
 }
 
 impl Default for OrderManagementStatus {
@@ -41,6 +39,8 @@ pub struct Order {
     pub refund_requested_at: Option<i64>, // 退款请求时间
     #[max_len(200)]
     pub refund_reason: String, // 退款原因
+    #[max_len(100)]
+    pub tracking_number: String, // 物流单号（发货时必填）
     #[max_len(88)]
     pub transaction_signature: String, // 支付交易签名
     pub bump: u8,                      // PDA bump
@@ -86,20 +86,43 @@ impl Order {
 
     // 检查订单是否可以修改
     pub fn can_modify(&self) -> bool {
-        matches!(
-            self.status,
-            OrderManagementStatus::Pending | OrderManagementStatus::Confirmed
-        )
+        matches!(self.status, OrderManagementStatus::Pending)
     }
 
-    // 检查订单是否可以请求退款（只允许已发货状态）
+    // 检查订单是否可以申请退款（只允许待处理状态）
     pub fn can_request_refund(&self) -> bool {
-        self.status == OrderManagementStatus::Shipped
+        self.status == OrderManagementStatus::Pending
     }
 
-    // 检查订单是否可以批准退款（只允许退款请求状态）
-    pub fn can_approve_refund(&self) -> bool {
-        self.status == OrderManagementStatus::RefundRequested
+    // 检查订单是否应该自动确认收货
+    pub fn should_auto_confirm(&self, auto_confirm_days: u32, current_time: i64) -> bool {
+        // 只有已发货状态的订单才能自动确认
+        if self.status != OrderManagementStatus::Shipped {
+            return false;
+        }
+
+        // 检查是否有发货时间
+        if let Some(shipped_at) = self.shipped_at {
+            let auto_confirm_seconds = auto_confirm_days as i64 * 24 * 60 * 60; // 转换为秒
+            let auto_confirm_time = shipped_at + auto_confirm_seconds;
+            return current_time >= auto_confirm_time;
+        }
+
+        false
+    }
+
+    // 自动确认收货
+    pub fn auto_confirm_delivery(&mut self, current_time: i64) -> Result<()> {
+        require!(
+            self.status == OrderManagementStatus::Shipped,
+            ErrorCode::InvalidOrderStatusTransition
+        );
+
+        self.status = OrderManagementStatus::Delivered;
+        self.delivered_at = Some(current_time);
+        self.updated_at = current_time;
+
+        Ok(())
     }
 
     // 更新订单状态
@@ -111,27 +134,14 @@ impl Order {
         let current_time = Clock::get()?.unix_timestamp;
 
         match new_status {
-            OrderManagementStatus::Confirmed => {
+            OrderManagementStatus::Shipped => {
                 require!(
                     self.status == OrderManagementStatus::Pending,
                     ErrorCode::InvalidOrderStatusTransition
                 );
-                self.confirmed_at = Some(timestamp);
-            }
-            OrderManagementStatus::Shipped => {
-                require!(
-                    self.status == OrderManagementStatus::Confirmed,
-                    ErrorCode::InvalidOrderStatusTransition
-                );
                 self.shipped_at = Some(timestamp);
             }
-            OrderManagementStatus::RefundRequested => {
-                require!(
-                    self.status == OrderManagementStatus::Shipped,
-                    ErrorCode::InvalidOrderStatusTransition
-                );
-                self.refund_requested_at = Some(timestamp);
-            }
+
             OrderManagementStatus::Delivered => {
                 require!(
                     self.status == OrderManagementStatus::Shipped,
@@ -141,7 +151,7 @@ impl Order {
             }
             OrderManagementStatus::Refunded => {
                 require!(
-                    self.can_approve_refund(),
+                    self.can_request_refund(),
                     ErrorCode::InvalidOrderStatusTransition
                 );
                 self.refunded_at = Some(timestamp);
@@ -161,14 +171,12 @@ impl Order {
 #[account]
 #[derive(InitSpace)]
 pub struct OrderStats {
-    pub total_orders: u64,            // 总订单数
-    pub pending_orders: u64,          // 待处理订单数
-    pub confirmed_orders: u64,        // 已确认订单数
-    pub shipped_orders: u64,          // 已发货订单数
-    pub refund_requested_orders: u64, // 退款请求中订单数
-    pub delivered_orders: u64,        // 已送达订单数
-    pub refunded_orders: u64,         // 已退款订单数
-    pub total_revenue: u64,           // 总收入
+    pub total_orders: u64,     // 总订单数
+    pub pending_orders: u64,   // 待处理订单数
+    pub shipped_orders: u64,   // 已发货订单数
+    pub delivered_orders: u64, // 已送达订单数
+    pub refunded_orders: u64,  // 已退款订单数
+    pub total_revenue: u64,    // 总收入
     pub bump: u8,
 }
 
@@ -182,9 +190,7 @@ impl OrderStats {
         self.total_orders += 1;
         match order.status {
             OrderManagementStatus::Pending => self.pending_orders += 1,
-            OrderManagementStatus::Confirmed => self.confirmed_orders += 1,
             OrderManagementStatus::Shipped => self.shipped_orders += 1,
-            OrderManagementStatus::RefundRequested => self.refund_requested_orders += 1,
             OrderManagementStatus::Delivered => {
                 self.delivered_orders += 1;
                 self.total_revenue += order.total_amount;
@@ -203,9 +209,7 @@ impl OrderStats {
         // 减少旧状态计数
         match old_status {
             OrderManagementStatus::Pending => self.pending_orders -= 1,
-            OrderManagementStatus::Confirmed => self.confirmed_orders -= 1,
             OrderManagementStatus::Shipped => self.shipped_orders -= 1,
-            OrderManagementStatus::RefundRequested => self.refund_requested_orders -= 1,
             OrderManagementStatus::Delivered => {
                 self.delivered_orders -= 1;
                 self.total_revenue -= order_amount;
@@ -216,9 +220,7 @@ impl OrderStats {
         // 增加新状态计数
         match new_status {
             OrderManagementStatus::Pending => self.pending_orders += 1,
-            OrderManagementStatus::Confirmed => self.confirmed_orders += 1,
             OrderManagementStatus::Shipped => self.shipped_orders += 1,
-            OrderManagementStatus::RefundRequested => self.refund_requested_orders += 1,
             OrderManagementStatus::Delivered => {
                 self.delivered_orders += 1;
                 self.total_revenue += order_amount;

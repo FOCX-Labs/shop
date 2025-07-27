@@ -75,27 +75,28 @@ pub struct SupportedToken {
     pub mint: Pubkey, // 代币mint地址
     #[max_len(10)]
     pub symbol: String, // 代币符号（如"USDC"）
-    pub decimals: u8, // 代币精度
     pub is_active: bool, // 是否启用
-    pub min_amount: u64, // 最小交易金额
 }
 
 impl SupportedToken {
-    pub fn new(mint: Pubkey, symbol: String, decimals: u8, min_amount: u64) -> Result<Self> {
+    pub fn new(mint: Pubkey, symbol: String) -> Result<Self> {
         require!(symbol.len() <= 10, ErrorCode::InvalidTokenSymbol);
-        require!(decimals <= 18, ErrorCode::InvalidTokenDecimals);
 
         Ok(Self {
             mint,
             symbol,
-            decimals,
             is_active: true,
-            min_amount,
         })
     }
 
-    pub fn validate_amount(&self, amount: u64) -> Result<()> {
-        require!(amount >= self.min_amount, ErrorCode::BelowMinimumAmount);
+    /// 从mint账户获取代币精度
+    pub fn get_decimals_from_mint(mint_account: &anchor_spl::token::Mint) -> u8 {
+        mint_account.decimals
+    }
+
+    /// 验证金额（使用动态的最小金额）
+    pub fn validate_amount(&self, amount: u64, min_amount: u64) -> Result<()> {
+        require!(amount >= min_amount, ErrorCode::BelowMinimumAmount);
         Ok(())
     }
 }
@@ -246,7 +247,6 @@ impl PaymentInfo {
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct ProductPaymentConfig {
     pub payment_token: Option<Pubkey>, // 支付代币mint（None表示SOL）
-    pub token_decimals: u8,            // 代币精度
     pub token_price: u64,              // 代币价格
     pub accept_sol: bool,              // 是否同时接受SOL
 }
@@ -255,24 +255,27 @@ impl ProductPaymentConfig {
     pub fn new_sol_only(sol_price: u64) -> Self {
         Self {
             payment_token: None,
-            token_decimals: 9, // SOL的精度
             token_price: sol_price,
             accept_sol: true,
         }
     }
 
-    pub fn new_token_payment(
-        token_mint: Pubkey,
-        token_decimals: u8,
-        token_price: u64,
-        accept_sol: bool,
-    ) -> Self {
+    pub fn new_token_payment(token_mint: Pubkey, token_price: u64, accept_sol: bool) -> Self {
         Self {
             payment_token: Some(token_mint),
-            token_decimals,
             token_price,
             accept_sol,
         }
+    }
+
+    /// 获取代币精度（需要传入mint账户）
+    pub fn get_token_decimals(mint_account: &anchor_spl::token::Mint) -> u8 {
+        mint_account.decimals
+    }
+
+    /// 获取SOL精度（固定为9）
+    pub fn get_sol_decimals() -> u8 {
+        9
     }
 
     pub fn supports_payment_method(&self, method: &PaymentMethod) -> bool {

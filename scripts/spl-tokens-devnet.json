@@ -8,13 +8,7 @@
       "mint": "DXDVt289yXEcqXDd9Ub3HqSBTWwrmNB8DzQEagv9Svtu",
       "decimals": 9,
       "tokenPrice": 1
-    },
-    {
-      "symbol": "USDT",
-      "mint": "97vfAdgJmX84paoWSk2W1qUthbpdcekgJYoKmReggxh7",
-      "decimals": 9,
-      "supply": 10000000000000000000
     }
   ],
-  "createdAt": "2025-07-23T01:19:00.255Z"
+  "createdAt": "2025-07-26T04:17:32.209Z"
 }

@@ -67,7 +67,6 @@ pub fn initialize_system_config(
     system_config.bloom_filter_size = config.bloom_filter_size;
     system_config.merchant_deposit_required = config.merchant_deposit_required;
     system_config.deposit_token_mint = config.deposit_token_mint;
-    system_config.deposit_token_decimals = config.deposit_token_decimals;
     // 初始化新增字段
     system_config.platform_fee_rate = config.platform_fee_rate;
     system_config.platform_fee_recipient = config.platform_fee_recipient;

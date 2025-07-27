@@ -5,11 +5,11 @@ pub mod instructions;
 pub mod state;
 pub mod utils;
 
-use instructions::order::{ApproveRefund, RequestRefund};
+use instructions::order::RequestRefund;
 use instructions::*;
 use state::{OrderManagementStatus, SupportedToken};
 
-declare_id!("mo5xPstZDm27CAkcyoTJnEovMYcW45tViAU6PZikv5q");
+declare_id!("5XZ74thixMBX2tQN9P3yLTugUK4YMdRLznDNa2mRdGNT");
 
 #[program]
 pub mod solana_e_commerce {
@@ -50,7 +50,7 @@ pub mod solana_e_commerce {
         instructions::id_generator::allocate_new_chunk(ctx)
     }
 
-    // 商户管理指令
+    // ==================== 商户管理指令 ====================
 
     // 原子性商户注册指令
     pub fn register_merchant_atomic(
@@ -61,6 +61,7 @@ pub mod solana_e_commerce {
         instructions::merchant::register_merchant_atomic(ctx, name, description)
     }
 
+    // 更新商户信息
     pub fn update_merchant_info(
         ctx: Context<UpdateMerchant>,
         name: Option<String>,
@@ -69,8 +70,14 @@ pub mod solana_e_commerce {
         instructions::merchant::update_merchant_info(ctx, name, description)
     }
 
+    // 获取商户统计信息
     pub fn get_merchant_stats(ctx: Context<GetMerchantStats>) -> Result<state::MerchantStats> {
         instructions::merchant::get_merchant_stats(ctx)
+    }
+
+    // 关闭商户账户
+    pub fn close_merchant(ctx: Context<CloseMerchant>, force: bool) -> Result<()> {
+        instructions::merchant::close_merchant(ctx, force)
     }
 
     // 商品管理指令
@@ -206,18 +213,8 @@ pub mod solana_e_commerce {
         ctx: Context<PurchaseProductEscrow>,
         product_id: u64,
         amount: u64,
-        timestamp: i64,
-        shipping_address: String,
-        notes: String,
     ) -> Result<()> {
-        instructions::payment::purchase_product_escrow(
-            ctx,
-            product_id,
-            amount,
-            timestamp,
-            shipping_address,
-            notes,
-        )
+        instructions::payment::purchase_product_escrow(ctx, product_id, amount)
     }
 
     // 关键词索引管理指令（已删除老旧函数，只保留if_needed版本）
@@ -363,24 +360,21 @@ pub mod solana_e_commerce {
         instructions::keyword_index::close_keyword_shard(ctx, keyword, shard_index, force)
     }
 
-    pub fn close_merchant(ctx: Context<CloseMerchant>, force: bool) -> Result<()> {
-        instructions::merchant::close_merchant(ctx, force)
-    }
-
     pub fn close_id_chunk(
         ctx: Context<CloseIdChunk>,
-        merchant_id: u64,
+        merchant_key: Pubkey,
         chunk_index: u32,
         force: bool,
     ) -> Result<()> {
-        instructions::id_generator::close_id_chunk(ctx, merchant_id, chunk_index, force)
+        instructions::id_generator::close_id_chunk(ctx, merchant_key, chunk_index, force)
     }
 
     pub fn close_merchant_id_account(
         ctx: Context<CloseMerchantIdAccount>,
+        merchant_key: Pubkey,
         force: bool,
     ) -> Result<()> {
-        instructions::id_generator::close_merchant_id_account(ctx, force)
+        instructions::id_generator::close_merchant_id_account(ctx, merchant_key, force)
     }
 
     // 订单管理指令
@@ -411,8 +405,9 @@ pub mod solana_e_commerce {
     pub fn update_order_status(
         ctx: Context<UpdateOrderStatus>,
         new_status: OrderManagementStatus,
+        tracking_number: Option<String>,
     ) -> Result<()> {
-        instructions::order::update_order_status(ctx, new_status)
+        instructions::order::update_order_status(ctx, new_status, tracking_number)
     }
 
     // 买家请求退款
@@ -420,10 +415,7 @@ pub mod solana_e_commerce {
         instructions::order::request_refund(ctx, refund_reason)
     }
 
-    // 商家批准退款并执行退款
-    pub fn approve_refund(ctx: Context<ApproveRefund>) -> Result<()> {
-        instructions::order::approve_refund(ctx)
-    }
+    // 商家批准退款指令已移除，买家可直接退款
 
     pub fn get_order_stats(ctx: Context<GetOrderStats>) -> Result<()> {
         instructions::order::get_order_stats(ctx)
@@ -431,6 +423,11 @@ pub mod solana_e_commerce {
 
     pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
         instructions::order::confirm_delivery(ctx)
+    }
+
+    // 自动确认收货（系统调用）
+    pub fn auto_confirm_delivery(ctx: Context<AutoConfirmDelivery>) -> Result<()> {
+        instructions::order::auto_confirm_delivery(ctx)
     }
 
     pub fn return_order(
@@ -453,12 +450,9 @@ pub mod solana_e_commerce {
 
     // ==================== 保证金管理指令 ====================
 
-    // 商户缴纳保证金
-    pub fn deposit_merchant_deposit(
-        ctx: Context<DepositMerchantDeposit>,
-        amount: u64,
-    ) -> Result<()> {
-        instructions::deposit::deposit_merchant_deposit(ctx, amount)
+    // 商户缴纳/补充保证金（统一指令）
+    pub fn manage_deposit(ctx: Context<ManageDeposit>, amount: u64) -> Result<()> {
+        instructions::deposit::manage_deposit(ctx, amount)
     }
 
     // 商户提取保证金
@@ -467,6 +461,15 @@ pub mod solana_e_commerce {
         amount: u64,
     ) -> Result<()> {
         instructions::deposit::withdraw_merchant_deposit(ctx, amount)
+    }
+
+    // 管理员扣除商户保证金
+    pub fn deduct_merchant_deposit(
+        ctx: Context<DeductMerchantDeposit>,
+        amount: u64,
+        reason: String,
+    ) -> Result<()> {
+        instructions::deposit::deduct_merchant_deposit(ctx, amount, reason)
     }
 
     // 查询商户保证金信息
@@ -493,9 +496,8 @@ pub struct SystemConfig {
     pub chunk_size: u32,
     pub bloom_filter_size: u16,
     // 保证金配置
-    pub merchant_deposit_required: u64, // 商户保证金要求（USDC，以最小单位计算）
-    pub deposit_token_mint: Pubkey,     // 保证金代币mint地址（USDC）
-    pub deposit_token_decimals: u8,     // 保证金代币精度
+    pub merchant_deposit_required: u64, // 商户保证金要求（以最小单位计算）
+    pub deposit_token_mint: Pubkey,     // 保证金代币mint地址
     // 新增平台手续费配置
     pub platform_fee_rate: u16, // 平台手续费率（基点，默认40 = 0.4%）
     pub platform_fee_recipient: Pubkey, // 平台手续费接收账户
@@ -511,10 +513,9 @@ impl Default for SystemConfig {
             max_keywords_per_product: 10,
             chunk_size: 10_000,
             bloom_filter_size: 256,
-            // 默认保证金配置：1000 USDC (6位精度)
-            merchant_deposit_required: 1000 * 1_000_000, // 1000 USDC
+            // 默认保证金配置：1000 Token (精度从mint账户动态获取)
+            merchant_deposit_required: 1000 * 1_000_000, // 1000 Token (假设6位精度)
             deposit_token_mint: Pubkey::default(),       // 需要在初始化时设置
-            deposit_token_decimals: 6,                   // USDC精度
             // 默认平台手续费配置
             platform_fee_rate: 40,                     // 0.4% (40基点)
             platform_fee_recipient: Pubkey::default(), // 需要在初始化时设置
@@ -538,5 +539,11 @@ impl SystemConfig {
     /// 设置保证金代币mint
     pub fn set_deposit_token_mint(&mut self, token_mint: Pubkey) {
         self.deposit_token_mint = token_mint;
+    }
+
+    /// 从mint账户获取代币精度（需要在指令中调用）
+    /// 这个方法需要在有mint账户访问权限的指令中使用
+    pub fn get_deposit_token_decimals_from_mint(mint_account: &anchor_spl::token::Mint) -> u8 {
+        mint_account.decimals
     }
 }

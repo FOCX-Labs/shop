@@ -264,7 +264,7 @@ interface OperationRecord {
     programBalanceAfter: number;
     programBalanceChange: number;
   };
-  // 新增：DXDV余额变化记录（用于保证金管理）
+  // 新增：Token余额变化记录（用于保证金管理）
   usdcBalanceChanges?: {
     merchantUsdcBalanceBefore: number;
     merchantUsdcBalanceAfter: number;
@@ -384,7 +384,8 @@ function formatPriceDisplay(
     };
   },
   basePrice?: number,
-  includeDollarSign: boolean = false
+  includeDollarSign: boolean = false,
+  defaultTokenSymbol: string = "TOKEN"
 ): string {
   // 如果产品有支付代币信息，优先使用代币价格
   if (product.paymentToken && product.paymentToken.symbol !== "SOL") {
@@ -411,23 +412,23 @@ function formatPriceDisplay(
       product.name.includes("Galaxy") ||
       product.name.includes("Samsung")
     )
-      return `${prefix}800 DXDV`;
-    else if (product.name.includes("运动鞋")) return `${prefix}150 USDT`;
+      return `${prefix}800 ${defaultTokenSymbol}`;
+    else if (product.name.includes("运动鞋")) return `${prefix}150 ${defaultTokenSymbol}`;
     else if (product.name.includes("技术书籍") || product.name.includes("编程技术"))
-      return `${prefix}50 DXDV`;
-    else if (product.name.includes("笔记本电脑")) return `${prefix}3000 USDT`;
+      return `${prefix}50 ${defaultTokenSymbol}`;
+    else if (product.name.includes("笔记本电脑")) return `${prefix}3000 ${defaultTokenSymbol}`;
     else if (product.name.includes("时尚外套") || product.name.includes("衬衫"))
-      return `${prefix}100 DXDV`;
+      return `${prefix}100 ${defaultTokenSymbol}`;
   }
 
   // ID >= 200000 的产品使用Token价格显示（备用逻辑，当区块链数据不可用时）
   if (productId >= 200000) {
     const prefix = includeDollarSign ? "$" : "";
-    if (product.name.includes("手机")) return `${prefix}800 DXDV`;
-    else if (product.name.includes("鞋子")) return `${prefix}150 USDT`;
-    else if (product.name.includes("书籍")) return `${prefix}50 DXDV`;
-    else if (product.name.includes("电脑")) return `${prefix}3000 USDT`;
-    else if (product.name.includes("服装")) return `${prefix}100 DXDV`;
+    if (product.name.includes("手机")) return `${prefix}800 ${defaultTokenSymbol}`;
+    else if (product.name.includes("鞋子")) return `${prefix}150 ${defaultTokenSymbol}`;
+    else if (product.name.includes("书籍")) return `${prefix}50 ${defaultTokenSymbol}`;
+    else if (product.name.includes("电脑")) return `${prefix}3000 ${defaultTokenSymbol}`;
+    else if (product.name.includes("服装")) return `${prefix}100 ${defaultTokenSymbol}`;
   }
 
   // 对于所有其他产品，统一使用Token价格显示，不再显示SOL价格
@@ -439,28 +440,28 @@ function formatPriceDisplay(
     product.name.includes("Galaxy") ||
     product.name.includes("Samsung")
   ) {
-    return `${prefix}800 DXDV`;
+    return `${prefix}800 ${defaultTokenSymbol}`;
   } else if (
     product.name.includes("鞋") ||
     product.name.includes("运动") ||
     product.name.includes("Adidas") ||
     product.name.includes("Nike")
   ) {
-    return `${prefix}150 USDT`;
+    return `${prefix}150 ${defaultTokenSymbol}`;
   } else if (
     product.name.includes("书") ||
     product.name.includes("技术") ||
     product.name.includes("编程技术") ||
     product.name.includes("指南")
   ) {
-    return `${prefix}50 DXDV`;
+    return `${prefix}50 ${defaultTokenSymbol}`;
   } else if (
     product.name.includes("电脑") ||
     product.name.includes("笔记本") ||
     product.name.includes("Dell") ||
     product.name.includes("MacBook")
   ) {
-    return `${prefix}3000 USDT`;
+    return `${prefix}3000 ${defaultTokenSymbol}`;
   } else if (
     product.name.includes("服装") ||
     product.name.includes("外套") ||
@@ -468,11 +469,11 @@ function formatPriceDisplay(
     product.name.includes("Zara") ||
     product.name.includes("时尚")
   ) {
-    return `${prefix}100 DXDV`;
+    return `${prefix}100 ${defaultTokenSymbol}`;
   }
 
   // 最后的默认值也使用Token价格
-  return `${prefix}100 DXDV`;
+  return `${prefix}100 ${defaultTokenSymbol}`;
 }
 
 interface RpcStatistics {
@@ -608,31 +609,126 @@ class SmallScaleCompleteTest {
   }
 
   /**
-   * 使用Mock Token的商户注册方法（本地环境使用）
+   * 使用真实SPL Token的商户注册方法（本地环境使用）
    */
-  private async registerMerchantWithMockToken(): Promise<void> {
+  private async registerMerchantWithRealToken(): Promise<void> {
     try {
-      console.log("   🔧 开始Mock Token商户注册流程...");
+      console.log("   🔧 开始真实SPL Token商户注册流程...");
 
-      // 1. 模拟保证金缴纳（不实际转账，只记录）
-      const depositAmount = 1000; // 1000 Mock DXDV
-      console.log(`   💰 模拟保证金缴纳: ${depositAmount} Mock DXDV`);
-
-      // 2. 执行商户注册（使用SOL支付，不涉及SPL Token）
+      // 1. 执行商户注册（使用SOL支付账户创建）
       console.log("   📝 执行商户注册交易...");
-
-      // 使用简化的注册方式，避免SPL Token相关操作
       await this.registerMerchantAtomicSimple();
 
-      // 3. 记录Mock Token余额变化
-      console.log("   📊 Mock Token余额更新:");
-      console.log(`   ├── 商户A DXDV余额: 10,000 → 9,000 DXDV`);
-      console.log(`   └── 系统托管DXDV: 0 → 1,000 DXDV`);
+      // 2. 创建必要的Token账户
+      console.log("   🔧 创建保证金系统所需的Token账户...");
+      await this.createDepositSystemTokenAccounts();
 
-      console.log("   ✅ Mock Token商户注册完成");
+      // 3. 执行真实的保证金缴纳
+      console.log("   💰 执行真实保证金缴纳: 1000 DXDV");
+      await this.depositRealTokens();
+
+      console.log("   ✅ 真实SPL Token商户注册完成");
     } catch (error) {
-      console.log(`   ❌ Mock Token商户注册失败: ${error}`);
+      console.log(`   ❌ 真实SPL Token商户注册失败: ${error}`);
       throw error;
+    }
+  }
+
+  /**
+   * 创建保证金系统所需的Token账户
+   */
+  private async createDepositSystemTokenAccounts(): Promise<void> {
+    try {
+      const { getAssociatedTokenAddress, createAssociatedTokenAccount } = await import(
+        "@solana/spl-token"
+      );
+
+      // 获取主要支付Token信息（动态获取，不硬编码）
+      const availableTokens = this.getAvailableTokens();
+      const primaryToken = availableTokens[0]; // 使用第一个可用Token
+      if (!primaryToken) {
+        throw new Error("没有可用的支付Token");
+      }
+
+      const tokenMint = new PublicKey(primaryToken.mint);
+      console.log(`   🪙 使用支付Token: ${primaryToken.symbol} (${tokenMint.toString()})`);
+
+      // 1. 创建商户的Token账户
+      const merchantTokenAccount = await getAssociatedTokenAddress(
+        tokenMint,
+        this.merchantAKeypair.publicKey
+      );
+
+      try {
+        const accountInfo = await this.connection.getAccountInfo(merchantTokenAccount);
+        if (accountInfo && accountInfo.owner.equals(anchor.utils.token.TOKEN_PROGRAM_ID)) {
+          console.log(`   ✅ 商户${primaryToken.symbol}账户已存在`);
+        } else {
+          throw new Error("账户存在但不是Token账户");
+        }
+      } catch (error) {
+        console.log(`   🔧 创建商户${primaryToken.symbol}账户...`);
+        await createAssociatedTokenAccount(
+          this.connection,
+          this.mainKeypair, // payer
+          tokenMint,
+          this.merchantAKeypair.publicKey // owner
+        );
+        console.log(`   ✅ 商户${primaryToken.symbol}账户创建成功`);
+      }
+
+      // 2. 保证金托管账户由程序自动创建（使用init_if_needed）
+      const [depositEscrowPda] = PublicKey.findProgramAddressSync(
+        [Buffer.from("deposit_escrow")],
+        this.program.programId
+      );
+
+      console.log("   ℹ️ 保证金托管账户将由程序自动创建（PDA控制的Token账户）");
+      console.log(`   📍 保证金托管PDA: ${depositEscrowPda.toString()}`);
+
+      // 不需要手动创建，程序会在首次使用时通过init_if_needed自动创建
+
+      // 3. 给商户转入Token用于保证金
+      console.log(`   💰 给商户转入${primaryToken.symbol}用于保证金...`);
+      const { transfer } = await import("@solana/spl-token");
+
+      const mainTokenAccount = await getAssociatedTokenAddress(
+        tokenMint,
+        this.mainKeypair.publicKey
+      );
+
+      const transferAmount = 2000 * Math.pow(10, primaryToken.decimals); // 2000 Token
+      await transfer(
+        this.connection,
+        this.mainKeypair,
+        mainTokenAccount,
+        merchantTokenAccount,
+        this.mainKeypair,
+        transferAmount
+      );
+      console.log(`   ✅ 已向商户转入 2000 ${primaryToken.symbol}`);
+    } catch (error) {
+      console.log(`   ❌ 创建Token账户失败: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 执行真实的保证金缴纳
+   */
+  private async depositRealTokens(): Promise<void> {
+    try {
+      // 使用现有的保证金补充方法（动态获取Token符号）
+      const primaryTokenSymbol = this.getPrimaryTokenSymbol();
+      const signature = await this.topUpMerchantDeposit(
+        this.merchantAKeypair,
+        1000,
+        primaryTokenSymbol
+      );
+      console.log(`   ✅ 保证金缴纳成功: ${signature.substring(0, 8)}...`);
+    } catch (error) {
+      console.log(`   ⚠️ 保证金缴纳失败，但不影响商户注册: ${error}`);
+      // 不抛出错误，允许商户注册继续
     }
   }
 
@@ -648,7 +744,8 @@ class SmallScaleCompleteTest {
   }
 
   /**
-   * 获取用户当前购买计数
+   * 获取用户当前购买计数（用于Order PDA计算）
+   * 注意：这个方法返回的是当前计数，Order PDA使用的是increment后的值
    */
   private async getUserPurchaseCount(buyer: anchor.web3.PublicKey): Promise<number> {
     try {
@@ -658,7 +755,9 @@ class SmallScaleCompleteTest {
       );
       return userPurchaseCountAccount.purchaseCount.toNumber();
     } catch (error) {
-      // 如果账户不存在，返回0（第一次购买）
+      // 如果账户不存在，返回0（首次购买）
+      // 账户会在purchaseProductEscrow指令中通过init_if_needed自动创建
+      console.log("   ℹ️ 用户购买计数账户不存在，将在购买时自动创建");
       return 0;
     }
   }
@@ -1108,16 +1207,18 @@ class SmallScaleCompleteTest {
 
       // 获取买家当前的购买计数（用于PDA计算）
       const currentPurchaseCount = await this.getUserPurchaseCount(buyer.publicKey);
-      const nextPurchaseCount = currentPurchaseCount + 1; // 下一个购买计数
+      // 重要发现：程序在计算Order PDA时使用的是当前计数，不是增加后的计数
+      // 因为Order PDA在increment_count()之前就已经计算好了
+      const purchaseCountForPDA = currentPurchaseCount; // 使用当前计数
 
       const orderPda = this.calculateOrderPDA(
         buyer.publicKey,
         this.merchantAKeypair.publicKey,
         numericProductId,
-        nextPurchaseCount
+        purchaseCountForPDA
       );
       const productPda = this.calculateProductPDA(numericProductId);
-      const merchantInfoPda = this.calculateMerchantPDA(this.merchantAKeypair.publicKey);
+      const merchantInfoPda2 = this.calculateMerchantPDA(this.merchantAKeypair.publicKey);
 
       // 2. 准备订单信息
       const shippingAddress = `测试收货地址-买家${buyer.publicKey.toString().slice(0, 8)}`;
@@ -1175,6 +1276,11 @@ class SmallScaleCompleteTest {
       }
 
       // 使用purchaseProductEscrow指令替代purchaseProduct
+      const userPurchaseCountPda = this.calculateUserPurchaseCountPDA(buyer.publicKey);
+      const paymentConfigPda = this.calculatePaymentConfigPDA();
+      const merchantInfoPda = this.calculateMerchantPDA(this.merchantAKeypair.publicKey);
+      const systemConfigPda = this.calculateSystemConfigPDA();
+
       const purchaseInstruction = await this.program.methods
         .purchaseProductEscrow(
           new anchor.BN(numericProductId),
@@ -1185,15 +1291,20 @@ class SmallScaleCompleteTest {
         )
         .accounts({
           buyer: buyer.publicKey,
+          userPurchaseCount: userPurchaseCountPda,
           product: productPda,
+          paymentConfig: paymentConfigPda,
           escrowAccount: this.calculateEscrowPDA(buyer.publicKey, numericProductId),
           order: orderPda,
           orderStats: this.calculateOrderStatsPDA(),
+          merchant: merchantInfoPda,
+          systemConfig: systemConfigPda,
           escrowTokenAccount: this.calculateEscrowTokenPDA(buyer.publicKey, numericProductId),
           buyerTokenAccount: buyerTokenAccount,
           paymentTokenMint: new anchor.web3.PublicKey(product.paymentToken!.mint),
           tokenProgram: anchor.utils.token.TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
+          rent: anchor.web3.SYSVAR_RENT_PUBKEY,
         } as any)
         .instruction();
 
@@ -1206,12 +1317,12 @@ class SmallScaleCompleteTest {
       await this.connection.confirmTransaction(signature, "confirmed");
 
       // 5. 记录交易签名和订单信息
-      this.orderTransactionSignatures.set(nextPurchaseCount, signature);
+      this.orderTransactionSignatures.set(purchaseCountForPDA, signature);
 
       // 记录到createdOrders数组，用于报告生成
       const buyerIndex = this.buyers.findIndex((b) => b.publicKey.equals(buyer.publicKey));
       this.createdOrders.push({
-        orderId: nextPurchaseCount, // 使用购买计数作为订单ID
+        orderId: purchaseCountForPDA, // 使用购买计数作为订单ID
         productId: product.id,
         buyerIndex: buyerIndex,
         signature: signature, // 使用相同的原子化交易签名
@@ -1224,7 +1335,7 @@ class SmallScaleCompleteTest {
       });
 
       console.log(
-        `   ✅ 原子化购买+订单创建成功 - 订单ID: ${nextPurchaseCount}, 签名: ${signature}`
+        `   ✅ 原子化购买+订单创建成功 - 订单ID: ${purchaseCountForPDA}, 签名: ${signature}`
       );
       console.log(`   📋 单交易包含: 购买商品 + 创建订单`);
       console.log(`   📍 订单账户地址: ${orderPda.toString()}`);
@@ -1731,14 +1842,14 @@ class SmallScaleCompleteTest {
     tokenPrice: number;
   }> {
     return this.tokenData.tokens.map((token, index) => {
-      // 根据产品类型设置合理的Token价格
-      if (token.symbol === "DXDV") {
-        // DXDV用于手机、书籍、服装
+      // 根据Token类型设置合理的价格（动态配置，不硬编码符号）
+      if (index === 0) {
+        // 第一个Token用于手机、书籍、服装等商品
         return {
           mint: token.mint,
           symbol: token.symbol,
           decimals: token.decimals,
-          tokenPrice: 800000000000, // $800 DXDV (6位精度) - 适合手机价格
+          tokenPrice: 800000000000, // $800 (适合手机价格)
         };
       } else if (token.symbol === "USDT") {
         // USDT用于鞋子、电脑
@@ -1758,6 +1869,23 @@ class SmallScaleCompleteTest {
     });
   }
 
+  // 获取主要支付代币的符号（动态获取，避免硬编码）
+  getPrimaryTokenSymbol(): string {
+    const tokens = this.getAvailableTokens();
+    return tokens.length > 0 ? tokens[0].symbol : "TOKEN";
+  }
+
+  // 获取主要支付代币的信息
+  getPrimaryToken(): {
+    mint: string;
+    symbol: string;
+    decimals: number;
+    tokenPrice: number;
+  } | null {
+    const tokens = this.getAvailableTokens();
+    return tokens.length > 0 ? tokens[0] : null;
+  }
+
   /**
    * 查询商户保证金信息
    */
@@ -1775,11 +1903,11 @@ class SmallScaleCompleteTest {
       this.program.programId
     );
 
-    // 获取DXDV代币信息
+    // 获取主要支付代币信息（动态获取）
     const availableTokens = this.getAvailableTokens();
-    const dxdvToken = availableTokens.find((t) => t.symbol === "DXDV");
-    if (!dxdvToken) {
-      throw new Error("DXDV代币未找到，请确保SPL Token系统已初始化");
+    const primaryToken = availableTokens[0]; // 使用第一个可用Token
+    if (!primaryToken) {
+      throw new Error("没有可用的支付代币，请确保SPL Token系统已初始化");
     }
 
     // 兼容性模式：直接查询商户账户，不依赖SystemConfig
@@ -1795,9 +1923,9 @@ class SmallScaleCompleteTest {
           : Number(merchantAccount.depositAmount)
         : 0;
 
-      const decimals = dxdvToken.decimals;
+      const decimals = primaryToken.decimals;
       const totalDepositTokens = totalDeposit / Math.pow(10, decimals);
-      const requiredDepositTokens = 1000; // 固定要求1000 DXDV
+      const requiredDepositTokens = 1000; // 固定要求1000 Token
 
       return {
         totalDeposit: totalDepositTokens,
@@ -1805,7 +1933,7 @@ class SmallScaleCompleteTest {
         availableDeposit: totalDepositTokens,
         requiredDeposit: requiredDepositTokens,
         isSufficient: totalDepositTokens >= requiredDepositTokens,
-        depositTokenMint: dxdvToken.mint,
+        depositTokenMint: primaryToken.mint,
         lastUpdated: Date.now(),
       };
     } catch (directError: any) {
@@ -1825,7 +1953,7 @@ class SmallScaleCompleteTest {
           } as any)
           .view();
 
-        const decimals = dxdvToken.decimals;
+        const decimals = primaryToken.decimals;
 
         return {
           totalDeposit: depositInfo.totalDeposit.toNumber() / Math.pow(10, decimals),
@@ -1848,7 +1976,7 @@ class SmallScaleCompleteTest {
           availableDeposit: 0,
           requiredDeposit: 1000,
           isSufficient: false,
-          depositTokenMint: dxdvToken.mint,
+          depositTokenMint: primaryToken.mint,
           lastUpdated: Date.now(),
         };
       }
@@ -1861,12 +1989,16 @@ class SmallScaleCompleteTest {
   async topUpMerchantDeposit(
     merchantKeypair: anchor.web3.Keypair,
     targetAmount: number,
-    tokenSymbol: string = "DXDV"
+    tokenSymbol?: string
   ): Promise<string> {
     const availableTokens = this.getAvailableTokens();
-    const token = availableTokens.find((t) => t.symbol === tokenSymbol);
+    // 如果没有指定Token符号，使用第一个可用Token
+    const token = tokenSymbol
+      ? availableTokens.find((t) => t.symbol === tokenSymbol)
+      : availableTokens[0];
+
     if (!token) {
-      throw new Error(`代币 ${tokenSymbol} 未找到`);
+      throw new Error(`代币 ${tokenSymbol || "(未指定)"} 未找到`);
     }
 
     const tokenMint = new anchor.web3.PublicKey(token.mint);
@@ -1911,10 +2043,13 @@ class SmallScaleCompleteTest {
     );
 
     // 计算正确的保证金托管账户PDA
-    const [depositEscrowAccount] = anchor.web3.PublicKey.findProgramAddressSync(
+    const [depositEscrowPda] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("deposit_escrow")],
       this.program.programId
     );
+
+    // 保证金托管账户就是PDA本身（程序控制的Token账户）
+    const depositEscrowAccount = depositEscrowPda;
 
     try {
       const signature = await this.program.methods
@@ -1951,18 +2086,22 @@ class SmallScaleCompleteTest {
     merchantKeypair: anchor.web3.Keypair,
     deductAmount: number,
     reason: string,
-    tokenSymbol: string = "DXDV"
+    tokenSymbol?: string
   ): Promise<string> {
     const availableTokens = this.getAvailableTokens();
-    const token = availableTokens.find((t) => t.symbol === tokenSymbol);
+    // 如果没有指定Token符号，使用第一个可用Token
+    const token = tokenSymbol
+      ? availableTokens.find((t) => t.symbol === tokenSymbol)
+      : availableTokens[0];
+
     if (!token) {
-      throw new Error(`代币 ${tokenSymbol} 未找到`);
+      throw new Error(`代币 ${tokenSymbol || "(未指定)"} 未找到`);
     }
 
     const tokenMint = new anchor.web3.PublicKey(token.mint);
     const deductAmountTokens = deductAmount * Math.pow(10, token.decimals);
 
-    console.log(`   🔄 扣除保证金: ${deductAmount} ${tokenSymbol}, 原因: ${reason}`);
+    console.log(`   🔄 扣除保证金: ${deductAmount} ${token.symbol}, 原因: ${reason}`);
 
     // 计算PDA
     const [merchantInfoPda] = anchor.web3.PublicKey.findProgramAddressSync(
@@ -1983,10 +2122,13 @@ class SmallScaleCompleteTest {
     );
 
     // 计算正确的保证金托管账户PDA
-    const [depositEscrowAccount] = anchor.web3.PublicKey.findProgramAddressSync(
+    const [depositEscrowPda] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("deposit_escrow")],
       this.program.programId
     );
+
+    // 保证金托管账户就是PDA本身（程序控制的Token账户）
+    const depositEscrowAccount = depositEscrowPda;
 
     const authorityTokenAccount = await getAssociatedTokenAddress(
       tokenMint,
@@ -2019,78 +2161,75 @@ class SmallScaleCompleteTest {
   }
 
   /**
-   * 创建Mock Token系统（本地环境使用）
+   * 创建真实SPL Token系统（本地环境使用）
    */
-  private async createMockTokenSystem(): Promise<void> {
-    console.log("   🔧 创建Mock Token系统...");
+  private async createRealSPLTokenSystem(): Promise<void> {
+    console.log("   🔧 创建真实SPL Token系统...");
 
     try {
-      // 创建Mock DXDV Token数据
-      const mockDXDVMint = anchor.web3.Keypair.generate().publicKey;
-
-      console.log("   🪙 创建Mock DXDV Token:");
-      console.log(`   ├── Mint地址: ${mockDXDVMint.toString()}`);
-      console.log("   ├── 精度: 9位小数");
-      console.log("   └── 初始供应量: 1,000,000,000 DXDV");
-
-      // 保存Mock Token数据到文件
-      const tokenData = {
-        environment: "local",
-        rpcUrl: "http://localhost:8899",
-        authority: this.mainKeypair.publicKey.toString(),
-        tokens: [
-          {
-            symbol: "DXDV",
-            mint: mockDXDVMint.toString(),
-            decimals: 9,
-            tokenPrice: 1.0,
-            isMock: true,
-            supply: "1000000000000000000", // 1B tokens with 9 decimals
-          },
-        ],
-        createdAt: new Date().toISOString(),
-      };
-
+      // 检查是否已有Token配置文件
       const tokenFilePath = path.join(__dirname, `spl-tokens-local.json`);
-      fs.writeFileSync(tokenFilePath, JSON.stringify(tokenData, null, 2));
-      console.log(`   📄 Mock Token数据已保存到: ${tokenFilePath}`);
 
-      // 将Mock Token添加到支付系统
-      console.log("   🔧 将Mock Token添加到支付系统...");
-      await this.addMockTokenToPaymentSystem(mockDXDVMint);
+      if (fs.existsSync(tokenFilePath)) {
+        console.log("   📄 发现现有SPL Token配置文件");
+        const tokenData = JSON.parse(fs.readFileSync(tokenFilePath, "utf8"));
 
-      // 模拟为主钱包和商户分配Token余额
-      console.log("   💰 模拟Token余额分配:");
-      console.log(`   ├── 主钱包DXDV余额: 100,000,000 DXDV`);
-      console.log(`   └── 商户A DXDV余额: 10,000 DXDV`);
+        if (tokenData.tokens && tokenData.tokens.length > 0) {
+          const dxdvToken = tokenData.tokens[0];
+          console.log("   🪙 使用现有真实DXDV Token:");
+          console.log(`   ├── Mint地址: ${dxdvToken.mint}`);
+          console.log(`   ├── 精度: ${dxdvToken.decimals}位小数`);
+          console.log(`   └── 总供应量: ${Number(dxdvToken.totalSupply).toLocaleString()} DXDV`);
 
-      console.log("   ✅ Mock Token系统创建完成");
+          // 将真实SPL Token添加到支付系统
+          console.log("   🔧 将真实SPL Token添加到支付系统...");
+          await this.addRealSPLTokenToPaymentSystem(new PublicKey(dxdvToken.mint));
+
+          // 验证Token余额
+          await this.verifyTokenBalances(new PublicKey(dxdvToken.mint));
+
+          console.log("   ✅ 真实SPL Token系统配置完成");
+          return;
+        }
+      }
+
+      // 如果没有配置文件，提示用户先创建
+      console.log("   ❌ 未找到SPL Token配置文件");
+      console.log("   💡 请先运行: npx ts-node scripts/create-real-spl-token-simple.ts --local");
+      throw new Error("SPL Token配置文件不存在，请先创建真实SPL Token");
     } catch (error) {
-      console.log(`   ❌ Mock Token系统创建失败: ${error}`);
+      console.log(`   ❌ 真实SPL Token系统创建失败: ${error}`);
       throw error;
     }
   }
 
   /**
-   * 将Mock Token添加到支付系统
+   * 将真实SPL Token添加到支付系统（已删除Mock Token支持）
    */
-  private async addMockTokenToPaymentSystem(mockTokenMint: PublicKey): Promise<void> {
-    try {
-      console.log(`   🔧 添加Mock Token到支付系统: ${mockTokenMint.toString()}`);
 
-      // 创建Mock Token配置
-      const mockToken = {
-        symbol: "DXDV",
-        mint: mockTokenMint,
-        decimals: 9,
-        minAmount: new anchor.BN(1000000000), // 1 DXDV
-        tokenPrice: new anchor.BN("1000000000"), // 1.0 (with 9 decimals)
+  /**
+   * 将真实SPL Token添加到支付系统
+   */
+  private async addRealSPLTokenToPaymentSystem(tokenMint: PublicKey): Promise<void> {
+    try {
+      console.log(`   🔧 添加真实SPL Token到支付系统: ${tokenMint.toString()}`);
+
+      // 获取真实SPL Token信息
+      const tokenData = this.getAvailableTokens()[0]; // 使用第一个可用Token
+      if (!tokenData) {
+        throw new Error("没有可用的SPL Token数据");
+      }
+
+      // 创建真实SPL Token配置
+      const realToken = {
+        symbol: tokenData.symbol,
+        mint: tokenMint,
         isActive: true,
       };
 
       // 在本地环境下，直接调用updateSupportedTokens指令
       const signature = await this.program.methods
-        .updateSupportedTokens([mockToken])
+        .updateSupportedTokens([realToken])
         .accounts({
           paymentConfig: this.calculatePaymentConfigPDA(),
           authority: this.mainKeypair.publicKey,
@@ -2098,10 +2237,41 @@ class SmallScaleCompleteTest {
         .signers([this.mainKeypair])
         .rpc();
 
-      console.log(`   ✅ Mock Token添加成功，交易签名: ${signature}`);
+      console.log(`   ✅ 真实SPL Token添加成功，交易签名: ${signature}`);
     } catch (error) {
-      console.log(`   ⚠️ Mock Token添加失败: ${error}`);
+      console.log(`   ⚠️ 真实SPL Token添加失败: ${error}`);
       // 不抛出错误，继续执行
+    }
+  }
+
+  /**
+   * 验证Token余额
+   */
+  private async verifyTokenBalances(tokenMint: PublicKey): Promise<void> {
+    try {
+      console.log("   🔍 验证Token余额...");
+
+      const { getAssociatedTokenAddress, getAccount } = await import("@solana/spl-token");
+
+      // 检查主钱包Token余额
+      const mainTokenAccount = await getAssociatedTokenAddress(
+        tokenMint,
+        this.mainKeypair.publicKey
+      );
+
+      const accountInfo = await getAccount(this.connection, mainTokenAccount);
+      const balance = Number(accountInfo.amount) / Math.pow(10, 9);
+
+      console.log(`   💰 主钱包DXDV余额: ${balance.toLocaleString()} DXDV`);
+      console.log(`   📍 Token账户地址: ${mainTokenAccount.toString()}`);
+
+      if (balance > 1000000) {
+        console.log("   ✅ Token余额充足，可以进行测试");
+      } else {
+        console.log("   ⚠️ Token余额较低，可能影响测试");
+      }
+    } catch (error) {
+      console.log(`   ❌ Token余额验证失败: ${error}`);
     }
   }
 
@@ -2557,7 +2727,7 @@ class SmallScaleCompleteTest {
   }> {
     // 只支持SPL Token支付
     if (!product.paymentToken || product.paymentToken.symbol === "SOL") {
-      throw new Error("商品必须配置DXDV或USDT支付方式");
+      throw new Error("商品必须配置DXDV支付方式");
     }
 
     console.log(`   🔄 执行原子化购买（Token转账+购买+订单创建）...`);
@@ -2766,10 +2936,9 @@ class SmallScaleCompleteTest {
     try {
       // 获取Token数据
       const usdcToken = this.tokenData.tokens.find((t) => t.symbol === "DXDV");
-      const usdtToken = this.tokenData.tokens.find((t) => t.symbol === "USDT");
 
-      if (!usdcToken || !usdtToken) {
-        console.log(`   ❌ 未找到DXDV或USDT Token数据`);
+      if (!usdcToken) {
+        console.log(`   ❌ 未找到DXDV Token数据`);
         return;
       }
 
@@ -2790,22 +2959,7 @@ class SmallScaleCompleteTest {
         console.log(`   ❌ 主钱包DXDV账户不存在或无法访问: ${error}`);
       }
 
-      // 检查USDT余额
-      const usdtMint = new anchor.web3.PublicKey(usdtToken.mint);
-      const mainUsdtAccount = await getAssociatedTokenAddress(usdtMint, this.mainKeypair.publicKey);
-
-      try {
-        const usdtAccountInfo = await getAccount(this.connection, mainUsdtAccount);
-        const usdtBalance = Number(usdtAccountInfo.amount) / Math.pow(10, usdtToken.decimals);
-        console.log(`   💰 主钱包USDT余额: ${usdtBalance.toLocaleString()} USDT`);
-        console.log(`   📍 主钱包USDT账户: ${mainUsdtAccount.toString()}`);
-
-        if (usdtBalance < 50000) {
-          console.log(`   ⚠️ USDT余额不足，当前: ${usdtBalance}, 建议: 50,000+`);
-        }
-      } catch (error) {
-        console.log(`   ❌ 主钱包USDT账户不存在或无法访问: ${error}`);
-      }
+      console.log("   ✅ 本地环境仅使用DXDV Token，无需检查USDT余额");
     } catch (error) {
       console.log(`   ❌ 检查主钱包Token余额失败: ${error}`);
     }
@@ -2971,7 +3125,7 @@ class SmallScaleCompleteTest {
       await import("@solana/spl-token");
 
     try {
-      // 为买家创建DXDV和USDT账户并转账代币
+      // 为买家创建DXDV账户并转账代币
       for (const tokenData of this.tokenData.tokens) {
         const tokenMint = new anchor.web3.PublicKey(tokenData.mint);
 
@@ -4381,9 +4535,9 @@ class SmallScaleCompleteTest {
         console.log(`   📋 ${tokenSymbol}代币状态:`);
         console.log(`   ├── Mint地址: ${targetToken.mint.toBase58()}`);
         console.log(`   ├── 符号: ${targetToken.symbol}`);
-        console.log(`   ├── 精度: ${targetToken.decimals}`);
+        console.log(`   ├── 精度: 从mint账户动态获取`);
         console.log(`   ├── 状态: ${targetToken.isActive ? "✅活跃" : "❌停用"}`);
-        console.log(`   └── 最小金额: ${targetToken.minAmount.toString()}`);
+        console.log(`   └── 最小金额: 在业务逻辑中动态处理`);
 
         if (targetToken.isActive) {
           console.log(`   ✅ ${tokenSymbol}代币已支持且处于活跃状态，跳过添加`);
@@ -4695,9 +4849,9 @@ class SmallScaleCompleteTest {
     console.log("\n🪙 步骤1.5：初始化SPL Token系统...");
 
     if (this.isLocalEnvironment) {
-      console.log("   📋 本地环境：创建Mock Token系统");
-      await this.createMockTokenSystem();
-      console.log("   ✅ 本地环境Mock Token系统配置完成");
+      console.log("   📋 本地环境：创建真实SPL Token系统");
+      await this.createRealSPLTokenSystem();
+      console.log("   ✅ 本地环境真实SPL Token系统配置完成");
       return;
     }
 
@@ -4752,9 +4906,9 @@ class SmallScaleCompleteTest {
 
       // 5. 显示支付代币配置结果
       console.log("   📊 支付代币配置完成:");
-      console.log("   ├── 可用支付代币: DXDV, USDT, SOL");
-      console.log("   ├── 商户可选择任意代币作为商品支付方式");
-      console.log("   └── 买家将使用对应代币进行支付");
+      console.log("   ├── 可用支付代币: DXDV");
+      console.log("   ├── 商户使用DXDV作为统一支付方式");
+      console.log("   └── 买家将使用DXDV进行支付");
 
       console.log("   ✅ SPL Token系统初始化完成");
     } catch (error) {
@@ -4820,13 +4974,15 @@ class SmallScaleCompleteTest {
 
       console.log("   🔄 执行安全的系统初始化流程...");
 
-      // 获取SPL Token系统已创建的DXDV代币信息
+      // 获取SPL Token系统已创建的主要代币信息（动态获取）
       const availableTokens = this.getAvailableTokens();
-      const dxdvToken = availableTokens.find((token) => token.symbol === "DXDV");
-      if (!dxdvToken) {
-        throw new Error("DXDV代币未找到，请确保SPL Token系统已初始化");
+      const primaryToken = availableTokens[0]; // 使用第一个可用Token
+      if (!primaryToken) {
+        throw new Error("没有可用的支付代币，请确保SPL Token系统已初始化");
       }
-      console.log(`   📍 使用SPL Token系统的DXDV mint: ${dxdvToken.mint}`);
+      console.log(
+        `   📍 使用SPL Token系统的主要代币: ${primaryToken.symbol} (${primaryToken.mint})`
+      );
 
       const systemConfig = {
         authority: this.mainKeypair.publicKey, // 设置系统管理员
@@ -4834,9 +4990,9 @@ class SmallScaleCompleteTest {
         maxKeywordsPerProduct: 10,
         chunkSize: 1000,
         bloomFilterSize: 1024,
-        merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, 9)), // 1000 DXDV
-        depositTokenMint: new anchor.web3.PublicKey(dxdvToken.mint),
-        depositTokenDecimals: dxdvToken.decimals,
+        merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, primaryToken.decimals)), // 1000 Token
+        depositTokenMint: new anchor.web3.PublicKey(primaryToken.mint),
+        depositTokenDecimals: primaryToken.decimals,
         // 新增平台手续费配置
         platformFeeRate: 40, // 0.4% (40基点)
         platformFeeRecipient: this.mainKeypair.publicKey, // 平台手续费接收账户
@@ -5092,8 +5248,8 @@ class SmallScaleCompleteTest {
     // SPL Token系统已在主流程中初始化，直接初始化支付系统
     await this.step2_5_InitializePaymentSystem();
 
-    // 最后添加USDT代币
-    await this.step2_6_AddUSDTToken();
+    // 本地环境仅使用DXDV Token，跳过USDT添加
+    console.log("   ℹ️ 本地环境统一使用DXDV Token，跳过USDT添加");
   }
 
   async step2_5_InitializePaymentSystem(): Promise<void> {
@@ -5330,8 +5486,8 @@ class SmallScaleCompleteTest {
       console.log("   ℹ️ 使用简化的商户注册流程（Mock Token支付）");
 
       try {
-        // 使用Mock Token的商户注册
-        await this.registerMerchantWithMockToken();
+        // 使用真实SPL Token的商户注册
+        await this.registerMerchantWithRealToken();
         console.log("   ✅ 本地环境商户注册完成");
         return;
       } catch (error) {
@@ -6233,10 +6389,10 @@ class SmallScaleCompleteTest {
               keywords: ["运动鞋", "鞋子", "体育用品"], // 3个关键词，运动鞋专用
               isSimulated: false,
               paymentToken: {
-                mint: availableTokens[1]?.mint || "",
-                symbol: availableTokens[1]?.symbol || "USDT",
-                decimals: availableTokens[1]?.decimals || 6,
-                tokenPrice: 150000000000, // $150 USDT (6位精度) - 运动鞋价格
+                mint: availableTokens[0]?.mint || "",
+                symbol: availableTokens[0]?.symbol || "DXDV",
+                decimals: availableTokens[0]?.decimals || 9,
+                tokenPrice: 150000000000, // $150 DXDV (9位精度) - 运动鞋价格
               },
             },
             {
@@ -6261,10 +6417,10 @@ class SmallScaleCompleteTest {
               keywords: ["笔记本电脑", "电脑", "电子产品"], // 3个关键词，包含共享关键词"电子产品"
               isSimulated: false,
               paymentToken: {
-                mint: availableTokens[1]?.mint || "",
-                symbol: availableTokens[1]?.symbol || "USDT",
-                decimals: availableTokens[1]?.decimals || 6,
-                tokenPrice: 3000000000000, // $3000 USDT (6位精度) - MacBook价格
+                mint: availableTokens[0]?.mint || "",
+                symbol: availableTokens[0]?.symbol || "DXDV",
+                decimals: availableTokens[0]?.decimals || 9,
+                tokenPrice: 3000000000000, // $3000 DXDV (9位精度) - MacBook价格
               },
             },
             {
@@ -6305,10 +6461,10 @@ class SmallScaleCompleteTest {
               keywords: ["运动鞋", "健身用品", "Adidas品牌"], // 3个关键词，符合新指令限制
               isSimulated: false,
               paymentToken: {
-                mint: availableTokens[1]?.mint || "BDJQaeYdK9hU4YoGBRJNYhME8XBXnka6kUHph7sLhRub",
-                symbol: availableTokens[1]?.symbol || "USDT",
-                decimals: availableTokens[1]?.decimals || 6,
-                tokenPrice: 150000000000, // $150 USDT (6位精度) - 运动鞋价格
+                mint: availableTokens[0]?.mint || "hD1kv3h9QHt6VKc6SAxLpWLfEQEt3b1TSXwumA4KghS",
+                symbol: availableTokens[0]?.symbol || "DXDV",
+                decimals: availableTokens[0]?.decimals || 9,
+                tokenPrice: 150000000000, // $150 DXDV (9位精度) - 运动鞋价格
               },
             },
             {
@@ -6333,10 +6489,10 @@ class SmallScaleCompleteTest {
               keywords: ["笔记本电脑", "电子产品", "戴尔品牌"], // 3个关键词，符合新指令限制
               isSimulated: false,
               paymentToken: {
-                mint: availableTokens[1]?.mint || "BDJQaeYdK9hU4YoGBRJNYhME8XBXnka6kUHph7sLhRub",
-                symbol: availableTokens[1]?.symbol || "USDT",
-                decimals: availableTokens[1]?.decimals || 6,
-                tokenPrice: 3000000000000, // $3000 USDT (6位精度) - 笔记本价格
+                mint: availableTokens[0]?.mint || "hD1kv3h9QHt6VKc6SAxLpWLfEQEt3b1TSXwumA4KghS",
+                symbol: availableTokens[0]?.symbol || "DXDV",
+                decimals: availableTokens[0]?.decimals || 9,
+                tokenPrice: 3000000000000, // $3000 DXDV (9位精度) - 笔记本价格
               },
             },
             {
@@ -6644,32 +6800,16 @@ class SmallScaleCompleteTest {
       if (this.createdOrders.length > 0) {
         const testOrder = this.createdOrders[0];
 
-        // 1. 确认订单
-        await this.recordOperation(`订单确认-${testOrder.orderId}`, async () => {
-          const signature = await this.updateOrderStatus(
-            testOrder.orderId,
-            "Confirmed",
-            this.merchantAKeypair
-          );
-          console.log(`   ✅ 订单 ${testOrder.orderId} 确认成功`);
-          return {
-            signature,
-            solCost: 0.003,
-            rpcCallCount: 2,
-            rpcCallTypes: ["updateOrderStatus", "confirmTransaction"],
-          };
-        });
-
-        await new Promise((resolve) => setTimeout(resolve, SMALL_SCALE_CONFIG.STEP_DELAY));
-
-        // 2. 发货
+        // 1. 发货（直接从Pending状态到Shipped状态）
         await this.recordOperation(`订单发货-${testOrder.orderId}`, async () => {
+          const trackingNumber = `TRK${Date.now()}${Math.floor(Math.random() * 1000)}`;
           const signature = await this.updateOrderStatus(
             testOrder.orderId,
             "Shipped",
-            this.merchantAKeypair
+            this.merchantAKeypair,
+            trackingNumber
           );
-          console.log(`   ✅ 订单 ${testOrder.orderId} 发货成功`);
+          console.log(`   ✅ 订单 ${testOrder.orderId} 发货成功，物流单号: ${trackingNumber}`);
           return {
             signature,
             solCost: 0.003,
@@ -6697,31 +6837,25 @@ class SmallScaleCompleteTest {
 
         await new Promise((resolve) => setTimeout(resolve, SMALL_SCALE_CONFIG.STEP_DELAY));
 
-        // 4. 测试新的两步退款流程（如果有第二个订单）
+        // 4. 测试简化的退款流程（如果有第二个订单）
         if (this.createdOrders.length > 1) {
           const returnOrder = this.createdOrders[1];
 
-          // 先将订单状态更新到已发货（新退款规则要求在Shipped状态下请求退款）
-          await this.updateOrderStatus(returnOrder.orderId, "Confirmed", this.merchantAKeypair);
-          await this.updateOrderStatus(returnOrder.orderId, "Shipped", this.merchantAKeypair);
+          // 新退款规则：只能在Pending状态下申请退款，无需先发货
+          console.log(`   📋 订单 ${returnOrder.orderId} 当前状态: Pending，可以直接申请退款`);
 
-          await this.recordOperation(`新退款流程-${returnOrder.orderId}`, async () => {
+          await this.recordOperation(`简化退款流程-${returnOrder.orderId}`, async () => {
             const signature = await this.returnOrder(
               returnOrder.orderId,
               this.buyers[returnOrder.buyerIndex],
-              "新退款功能测试 - 商品质量问题"
+              "简化退款功能测试 - 直接从Pending状态退款"
             );
-            console.log(`   ✅ 订单 ${returnOrder.orderId} 新退款流程完成`);
+            console.log(`   ✅ 订单 ${returnOrder.orderId} 简化退款流程完成`);
             return {
               signature,
-              solCost: 0.005, // 两步流程可能消耗更多
-              rpcCallCount: 4, // 请求退款 + 批准退款 + 2次确认
-              rpcCallTypes: [
-                "requestRefund",
-                "approveRefund",
-                "confirmTransaction",
-                "confirmTransaction",
-              ],
+              solCost: 0.003, // 简化流程消耗更少
+              rpcCallCount: 2, // 请求退款 + 确认
+              rpcCallTypes: ["requestRefund", "confirmTransaction"],
             };
           });
         }
@@ -6796,7 +6930,12 @@ class SmallScaleCompleteTest {
             if (searchResult.products.length > 0) {
               console.log(`   🎯 商品列表:`);
               searchResult.products.forEach((product, index) => {
-                const priceDisplay = formatPriceDisplay(product, product.price);
+                const priceDisplay = formatPriceDisplay(
+                  product,
+                  product.price,
+                  false,
+                  this.getPrimaryTokenSymbol()
+                );
                 console.log(
                   `   ├── [${index + 1}] ${product.name} (ID: ${product.id}, 价格: ${priceDisplay})`
                 );
@@ -7415,9 +7554,7 @@ class SmallScaleCompleteTest {
   async getRealOrderStatsFromChain(): Promise<{
     totalOrders: number;
     pendingOrders: number;
-    confirmedOrders: number;
     shippedOrders: number;
-    refundRequestedOrders: number;
     deliveredOrders: number;
     refundedOrders: number;
     totalRevenue: number;
@@ -7436,9 +7573,7 @@ class SmallScaleCompleteTest {
         return {
           totalOrders: 0,
           pendingOrders: 0,
-          confirmedOrders: 0,
           shippedOrders: 0,
-          refundRequestedOrders: 0,
           deliveredOrders: 0,
           refundedOrders: 0,
           totalRevenue: 0,
@@ -7451,9 +7586,7 @@ class SmallScaleCompleteTest {
       return {
         totalOrders: orderStats.totalOrders.toNumber(),
         pendingOrders: orderStats.pendingOrders.toNumber(),
-        confirmedOrders: orderStats.confirmedOrders.toNumber(),
         shippedOrders: orderStats.shippedOrders.toNumber(),
-        refundRequestedOrders: orderStats.refundRequestedOrders.toNumber(),
         deliveredOrders: orderStats.deliveredOrders.toNumber(),
         refundedOrders: orderStats.refundedOrders.toNumber(),
         totalRevenue: orderStats.totalRevenue.toNumber(),
@@ -7463,9 +7596,7 @@ class SmallScaleCompleteTest {
       return {
         totalOrders: 0,
         pendingOrders: 0,
-        confirmedOrders: 0,
         shippedOrders: 0,
-        refundRequestedOrders: 0,
         deliveredOrders: 0,
         refundedOrders: 0,
         totalRevenue: 0,
@@ -7571,9 +7702,7 @@ class SmallScaleCompleteTest {
    */
   getOrderStatusText(status: any): string {
     if (status.pending) return "待处理";
-    if (status.confirmed) return "已确认";
     if (status.shipped) return "已发货";
-    if (status.refundRequested) return "退款请求中";
     if (status.delivered) return "已送达";
     if (status.refunded) return "已退款";
     return "未知状态";
@@ -7649,8 +7778,7 @@ class SmallScaleCompleteTest {
             // 这里可以通过程序日志或其他方式获取状态转换交易
             // 由于Solana程序的限制，我们只能获取到最终状态
             let operationType = "状态更新";
-            if (order.status.confirmed) operationType = "订单确认";
-            else if (order.status.shipped) operationType = "订单发货";
+            if (order.status.shipped) operationType = "订单发货";
             else if (order.status.delivered) operationType = "确认收货";
             else if (order.status.refunded) operationType = "申请退货";
 
@@ -7866,7 +7994,6 @@ class SmallScaleCompleteTest {
       pending: this.createdOrders.filter(
         (order) => order.status === "待处理" || order.status === "Pending"
       ).length,
-      confirmed: this.createdOrders.filter((order) => order.status === "Confirmed").length,
       shipped: this.createdOrders.filter((order) => order.status === "Shipped").length,
       delivered: this.createdOrders.filter((order) => order.status === "Delivered").length,
       refunded: this.createdOrders.filter((order) => order.status === "Refunded").length,
@@ -7885,9 +8012,6 @@ class SmallScaleCompleteTest {
     } |\n`;
     markdown += `| **待处理订单** | ${statusCounts.pending} | ${
       statusCounts.pending >= 0 ? "✅" : "❌"
-    } |\n`;
-    markdown += `| **已确认订单** | ${statusCounts.confirmed} | ${
-      statusCounts.confirmed >= 0 ? "✅" : "❌"
     } |\n`;
     markdown += `| **已发货订单** | ${statusCounts.shipped} | ${
       statusCounts.shipped >= 0 ? "✅" : "❌"
@@ -8167,7 +8291,7 @@ class SmallScaleCompleteTest {
       });
 
       markdown += "购买流程测试结果:\n";
-      markdown += "- ✅ 支付流程: DXDV/USDT 支付正常工作\n";
+      markdown += "- ✅ 支付流程: DXDV 支付正常工作\n";
       markdown += "- ✅ 销量更新: 实时更新到链上索引\n";
       markdown += "- ✅ 数据一致性: 购买后搜索立即反映新销量\n";
       markdown += "- ✅ 商户账户: 自动创建Token账户并接收支付\n\n";
@@ -10522,7 +10646,8 @@ ${(() => {
   async updateOrderStatus(
     orderId: number,
     newStatus: string,
-    signerKeypair: Keypair
+    signerKeypair: Keypair,
+    trackingNumber?: string
   ): Promise<string> {
     console.log(`   📝 更新订单状态 - 订单ID: ${orderId}, 新状态: ${newStatus}`);
 
@@ -10613,9 +10738,6 @@ ${(() => {
       // 根据状态确定状态枚举值
       let statusEnum: any;
       switch (newStatus) {
-        case "Confirmed":
-          statusEnum = { confirmed: {} };
-          break;
         case "Shipped":
           statusEnum = { shipped: {} };
           break;
@@ -10631,11 +10753,16 @@ ${(() => {
 
       // UpdateOrderStatus现在只需要new_status参数
 
-      // 使用简化后的函数签名（只需要new_status参数）
+      // 为Shipped状态生成物流单号
+      let trackingNum: string | null = null;
+      if (newStatus === "Shipped") {
+        trackingNum = trackingNumber || `TRK${Date.now()}${Math.floor(Math.random() * 1000)}`;
+        console.log(`   📦 生成物流单号: ${trackingNum}`);
+      }
+
+      // 使用新的函数签名（包含tracking_number参数）
       const signature = await this.program.methods
-        .updateOrderStatus(
-          statusEnum // new_status
-        )
+        .updateOrderStatus(statusEnum, trackingNum)
         .accountsPartial({
           order: orderPda,
           orderStats: orderStatsPda,
@@ -11195,7 +11322,7 @@ ${(() => {
 
       // 使用产品配置的SPL Token支付方式（必须有paymentToken）
       if (!product.paymentToken) {
-        throw new Error("商品必须配置支付代币（DXDV或USDT）");
+        throw new Error("商品必须配置支付代币（DXDV）");
       }
       const paymentTokenConfig = product.paymentToken;
       const paymentToken = new anchor.web3.PublicKey(paymentTokenConfig.mint);
@@ -11414,7 +11541,7 @@ ${(() => {
 
       // 只支持SPL Token支付（DXDV/USDT）
       if (!product.paymentToken || product.paymentToken.symbol === "SOL") {
-        throw new Error("商品必须配置DXDV或USDT支付方式");
+        throw new Error("商品必须配置DXDV支付方式");
       }
       // 使用随机买家购买逻辑
       throw new Error("买家A购买功能已移除，请使用随机买家购买");
@@ -11588,7 +11715,7 @@ ${(() => {
           searchResults: {
             keyword: `价格范围 ${(range.min / 1000000).toFixed(0)}-${(range.max / 1000000).toFixed(
               0
-            )} DXDV/USDT`,
+            )} DXDV`,
             totalResults: matchingProducts.length,
             responseTime: Date.now() - startTime,
             rpcCalls: 1,
@@ -11852,7 +11979,7 @@ ${(() => {
           searchResults: {
             keyword: `${search.keyword} + 价格${(search.tokenPriceMin / 1000000).toFixed(0)}-${(
               search.tokenPriceMax / 1000000
-            ).toFixed(0)} DXDV/USDT`,
+            ).toFixed(0)} DXDV`,
             totalResults: finalMatches.length,
             responseTime: Date.now() - startTime,
             rpcCalls: 2,

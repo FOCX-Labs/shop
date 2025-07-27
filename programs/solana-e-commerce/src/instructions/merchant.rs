@@ -152,7 +152,6 @@ pub struct MerchantRegisteredAtomic {
 #[derive(Accounts)]
 #[instruction(name: String, description: String)]
 pub struct RegisterMerchantAtomic<'info> {
-    #[account(mut)]
     pub merchant: Signer<'info>,
 
     #[account(mut)]

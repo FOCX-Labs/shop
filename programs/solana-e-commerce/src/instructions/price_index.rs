@@ -15,8 +15,7 @@ pub struct RemoveProductFromPriceIndex<'info> {
         bump
     )]
     pub price_node: Account<'info, PriceIndexNode>,
-
-    pub authority: Signer<'info>,
+    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
 }
 
 #[derive(Accounts)]

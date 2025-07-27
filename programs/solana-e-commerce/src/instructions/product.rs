@@ -8,13 +8,7 @@ pub struct DeleteProduct<'info> {
     #[account(mut)]
     pub merchant: Signer<'info>,
 
-    #[account(
-        mut,
-        seeds = [b"merchant_info", merchant.key().as_ref()],
-        bump
-    )]
-    pub merchant_info: Account<'info, Merchant>,
-
+    // 移除merchant_info账户 - 产品计数统计功能非核心，权限验证通过product.merchant进行
     #[account(
         mut,
         seeds = [b"product", product_id.to_le_bytes().as_ref()],
@@ -56,13 +50,7 @@ pub struct UpdateProductPrice<'info> {
         constraint = product.merchant == merchant.key() @ ErrorCode::Unauthorized
     )]
     pub product: Account<'info, ProductBase>,
-
-    #[account(
-        mut,
-        seeds = [b"merchant_info", merchant.key().as_ref()],
-        bump
-    )]
-    pub merchant_info: Account<'info, Merchant>,
+    // 移除merchant_info账户 - 权限验证通过product.merchant字段进行，无需额外账户
 }
 
 /// 创建ProductBase指令 - 只处理核心业务数据
@@ -94,13 +82,7 @@ pub struct CreateProductBase<'info> {
     )]
     pub merchant_id_account: Account<'info, MerchantIdAccount>,
 
-    #[account(
-        mut,
-        seeds = [b"merchant_info", merchant.key().as_ref()],
-        bump
-    )]
-    pub merchant_info: Account<'info, Merchant>,
-
+    // 移除merchant_info账户 - 产品计数统计功能非核心，可通过其他方式获取
     #[account(
         mut,
         constraint = active_chunk.key() == merchant_id_account.active_chunk @ ErrorCode::InvalidActiveChunk
@@ -214,8 +196,7 @@ pub fn create_product_base(
     let mut cursor = std::io::Cursor::new(dst);
     product_data.try_serialize(&mut cursor)?;
 
-    // 5. 更新商户统计
-    ctx.accounts.merchant_info.increment_product_count()?;
+    // 5. 商户统计功能已移除 - 可通过查询链上产品账户获取统计信息
 
     msg!(
         "原子化产品创建成功，ID: {}, 名称: {}, 关键词数量: {}",
@@ -360,8 +341,8 @@ pub fn delete_product(
     hard_delete: bool,
     force: bool,
 ) -> Result<()> {
-    let merchant_info = &mut ctx.accounts.merchant_info;
     let product = &ctx.accounts.product;
+    // 移除merchant_info引用 - 统计功能已简化
     let product_id = product.id;
 
     // 权限验证（当force=false时）
@@ -379,10 +360,7 @@ pub fn delete_product(
 
     if hard_delete {
         // 硬删除：账户将通过close约束自动关闭并回收租金到beneficiary
-        // 更新商户统计（只有在非强制删除时才更新，避免统计错误）
-        if !force {
-            merchant_info.decrement_product_count()?;
-        }
+        // 商户统计功能已移除 - 可通过查询链上产品账户获取统计信息
 
         msg!(
             "商品已硬删除，ID: {}, 强制删除: {}, 租金已回收到受益人",

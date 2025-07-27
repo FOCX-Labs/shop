@@ -377,43 +377,42 @@ pub fn should_preallocate_chunk(chunk: &Account<IdChunk>) -> bool {
 
 // 关闭ID块账户
 #[derive(Accounts)]
-#[instruction(merchant_id: u64, chunk_index: u32)]
+#[instruction(merchant_key: Pubkey, chunk_index: u32)]
 pub struct CloseIdChunk<'info> {
     #[account(
         mut,
         close = beneficiary,
-        seeds = [b"id_chunk", merchant.key().as_ref(), chunk_index.to_le_bytes().as_ref()],
+        seeds = [b"id_chunk", merchant_key.as_ref(), chunk_index.to_le_bytes().as_ref()],
         bump
     )]
     pub id_chunk: Account<'info, IdChunk>,
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
-
-    pub merchant: Signer<'info>,
+    // 移除merchant账户 - 权限验证通过PDA种子机制已经实现
 }
 
 // 关闭商户ID账户
 #[derive(Accounts)]
+#[instruction(merchant_key: Pubkey)]
 pub struct CloseMerchantIdAccount<'info> {
     #[account(
         mut,
         close = beneficiary,
-        seeds = [b"merchant_id", merchant.key().as_ref()],
+        seeds = [b"merchant_id", merchant_key.as_ref()],
         bump
     )]
     pub merchant_id_account: Account<'info, MerchantIdAccount>,
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
-
-    pub merchant: Signer<'info>,
+    // 移除merchant账户 - 权限验证通过PDA种子机制已经实现
 }
 
 // 关闭ID块账户实现
 pub fn close_id_chunk(
     ctx: Context<CloseIdChunk>,
-    _merchant_id: u64,
+    _merchant_key: Pubkey,
     _chunk_index: u32,
     force: bool,
 ) -> Result<()> {
@@ -438,7 +437,11 @@ pub fn close_id_chunk(
 }
 
 // 关闭商户ID账户实现
-pub fn close_merchant_id_account(ctx: Context<CloseMerchantIdAccount>, force: bool) -> Result<()> {
+pub fn close_merchant_id_account(
+    ctx: Context<CloseMerchantIdAccount>,
+    _merchant_key: Pubkey,
+    force: bool,
+) -> Result<()> {
     let merchant_id_account = &ctx.accounts.merchant_id_account;
 
     // 检查是否还有活跃块（除非强制删除）

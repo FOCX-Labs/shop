@@ -18,8 +18,7 @@ pub struct RemoveProductFromKeywordIndex<'info> {
         bump
     )]
     pub target_shard: Account<'info, KeywordShard>,
-
-    pub authority: Signer<'info>,
+    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
 }
 
 #[derive(Accounts)]
@@ -78,8 +77,7 @@ pub struct CloseKeywordRoot<'info> {
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
-
-    pub authority: Signer<'info>,
+    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
 }
 
 // 关闭关键词分片账户
@@ -96,8 +94,7 @@ pub struct CloseKeywordShard<'info> {
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
-
-    pub authority: Signer<'info>,
+    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
 }
 
 pub fn remove_product_from_keyword_index(

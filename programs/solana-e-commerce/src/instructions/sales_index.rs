@@ -12,8 +12,7 @@ pub struct UpdateProductSalesIndex<'info> {
     /// CHECK: 新销量范围的节点，将在指令中验证
     #[account(mut)]
     pub new_sales_node: AccountInfo<'info>,
-
-    pub authority: Signer<'info>,
+    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
 }
 
 #[derive(Accounts)]
@@ -29,8 +28,7 @@ pub struct RemoveProductFromSalesIndex<'info> {
         bump
     )]
     pub sales_node: Account<'info, SalesIndexNode>,
-
-    pub authority: Signer<'info>,
+    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
 }
 
 #[derive(Accounts)]
