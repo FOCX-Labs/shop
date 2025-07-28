@@ -170,7 +170,7 @@ pub struct ConfirmDelivery<'info> {
 
     // 系统配置账户（获取保证金代币mint和平台手续费配置）
     #[account(
-        seeds = [b"system_config_v2"],
+        seeds = [b"system_config"],
         bump
     )]
     pub system_config: Account<'info, crate::SystemConfig>,
@@ -593,7 +593,7 @@ pub struct AutoConfirmDelivery<'info> {
 
     // 系统配置账户（获取自动确认天数）
     #[account(
-        seeds = [b"system_config_v2"],
+        seeds = [b"system_config"],
         bump
     )]
     pub system_config: Account<'info, crate::SystemConfig>,

@@ -46,7 +46,7 @@ pub struct InitializeSystemConfig<'info> {
         init,
         payer = payer,
         space = 8 + std::mem::size_of::<SystemConfig>(),
-        seeds = [b"system_config_v2"],
+        seeds = [b"system_config"],
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
@@ -87,7 +87,7 @@ pub fn initialize_system_config(
 pub struct CloseSystemConfig<'info> {
     #[account(
         mut,
-        seeds = [b"system_config_v2"],
+        seeds = [b"system_config"],
         bump,
         close = beneficiary
     )]
@@ -119,5 +119,58 @@ pub fn close_system_config(ctx: Context<CloseSystemConfig>, force: bool) -> Resu
     }
 
     msg!("系统配置账户关闭成功");
+    Ok(())
+}
+
+/// 强制关闭不兼容的系统配置账户（手动转移余额）
+#[derive(Accounts)]
+pub struct ForceCloseSystemConfig<'info> {
+    #[account(
+        mut,
+        seeds = [b"system_config"],
+        bump
+    )]
+    /// CHECK: 这个账户可能包含不兼容的数据，我们不尝试反序列化
+    pub system_config: AccountInfo<'info>,
+
+    #[account(mut)]
+    pub beneficiary: Signer<'info>,
+
+    #[account(
+        constraint = authority.key() == beneficiary.key() @ crate::error::ErrorCode::Unauthorized
+    )]
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+pub fn force_close_system_config(ctx: Context<ForceCloseSystemConfig>) -> Result<()> {
+    let system_config = &ctx.accounts.system_config;
+    let beneficiary = &ctx.accounts.beneficiary;
+
+    msg!(
+        "强制关闭系统配置账户: {}, 受益人: {}",
+        system_config.key(),
+        beneficiary.key()
+    );
+
+    // 检查账户所有者是否正确
+    require!(
+        system_config.owner == &crate::ID,
+        crate::error::ErrorCode::Unauthorized
+    );
+
+    // 手动转移所有余额到受益人
+    let lamports = system_config.lamports();
+    **system_config.try_borrow_mut_lamports()? = 0;
+    **beneficiary.try_borrow_mut_lamports()? = beneficiary
+        .lamports()
+        .checked_add(lamports)
+        .ok_or(crate::error::ErrorCode::ArithmeticOverflow)?;
+
+    // 清空账户数据
+    system_config.realloc(0, false)?;
+
+    msg!("系统配置账户强制关闭成功，转移 {} lamports", lamports);
     Ok(())
 }

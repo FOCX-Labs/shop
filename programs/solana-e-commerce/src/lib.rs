@@ -32,6 +32,11 @@ pub mod solana_e_commerce {
         instructions::initialize::close_system_config(ctx, force)
     }
 
+    // 强制关闭不兼容的系统配置账户
+    pub fn force_close_system_config(ctx: Context<ForceCloseSystemConfig>) -> Result<()> {
+        instructions::initialize::force_close_system_config(ctx)
+    }
+
     // ID生成器指令
     pub fn generate_product_id(ctx: Context<GenerateId>) -> Result<u64> {
         instructions::id_generator::generate_product_id(ctx)

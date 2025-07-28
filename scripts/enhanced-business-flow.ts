@@ -434,7 +434,7 @@ export class EnhancedBusinessFlowExecutor {
    * 初始化系统配置账户
    */
   private async initializeSystemConfig(): Promise<void> {
-    const [systemConfigPDA] = this.calculatePDA(["system_config_v2"]);
+    const [systemConfigPDA] = this.calculatePDA(["system_config"]);
 
     // 检查账户是否已存在
     const existingAccount = await this.connection.getAccountInfo(systemConfigPDA);
@@ -766,7 +766,7 @@ export class EnhancedBusinessFlowExecutor {
         this.merchantKeypair.publicKey.toBuffer(),
       ]);
       const [globalRootPDA] = this.calculatePDA(["global_id_root"]);
-      const [systemConfigPDA] = this.calculatePDA(["system_config_v2"]);
+      const [systemConfigPDA] = this.calculatePDA(["system_config"]);
       const [merchantIdAccountPDA] = this.calculatePDA([
         "merchant_id",
         this.merchantKeypair.publicKey.toBuffer(),
@@ -865,7 +865,7 @@ export class EnhancedBusinessFlowExecutor {
         "merchant_info",
         this.merchantKeypair.publicKey.toBuffer(),
       ]);
-      const [systemConfigPDA] = this.calculatePDA(["system_config_v2"]);
+      const [systemConfigPDA] = this.calculatePDA(["system_config"]);
       const [depositEscrowPDA] = this.calculatePDA(["deposit_escrow"]);
 
       // 提取1000 Token作为演示
@@ -956,8 +956,138 @@ export class EnhancedBusinessFlowExecutor {
       }
 
       console.log(`   ✅ 产品创建流程完成`);
+
+      // 添加基于1.txt的测试用例
+      console.log(`\n   🧪 执行基于1.txt的产品创建测试用例`);
+      await this.createProductFrom1txt();
     } catch (error) {
       console.error(`   ❌ 产品创建失败: ${(error as Error).message}`);
+      console.log(`   ⚠️ 继续执行后续步骤`);
+    }
+  }
+
+  /**
+   * 基于1.txt文件参数的产品创建测试用例
+   */
+  private async createProductFrom1txt(): Promise<void> {
+    try {
+      // 使用指定的密钥对作为商户进行签名
+      const merchantSecretKey = new Uint8Array([
+        123, 129, 64, 180, 245, 25, 254, 15, 55, 25, 154, 96, 86, 124, 150, 102, 83, 166, 201, 160,
+        57, 100, 79, 148, 102, 88, 66, 166, 4, 247, 146, 103, 105, 106, 2, 66, 92, 222, 103, 233,
+        38, 229, 199, 61, 72, 181, 44, 139, 16, 150, 226, 173, 237, 58, 183, 169, 209, 193, 61, 170,
+        222, 62, 154, 93,
+      ]);
+      const merchantKeypair = Keypair.fromSecretKey(merchantSecretKey);
+      const merchantPubkey = merchantKeypair.publicKey;
+
+      console.log(`   📋 基于1.txt文件的产品参数:`);
+      console.log(`   🔑 使用1.txt指定的商户密钥对:`);
+      console.log(`   🔑 商户地址: ${merchantPubkey.toString()}`);
+      console.log(`   ✅ 这是1.txt中指定的商户密钥对`);
+
+      // 基于1.txt解析的参数
+      const productData = {
+        name: "经常你才能想你",
+        description: "坚持坚持闹闹",
+        price: new anchor.BN("2366000000000"), // lamports
+        keywords: ["Digital Camera"],
+        inventory: new anchor.BN("6699"),
+        paymentToken: this.tokenMint!, // 使用当前系统的Token
+        shippingLocation: "Default Shipping Location",
+      };
+
+      console.log(`   📦 产品名称: ${productData.name}`);
+      console.log(`   📝 产品描述: ${productData.description}`);
+      console.log(`   💰 价格: ${productData.price.toString()} lamports`);
+      console.log(`   🔍 关键词: ${productData.keywords.join(", ")}`);
+      console.log(`   📦 库存: ${productData.inventory.toString()}`);
+      console.log(`   🚚 发货地点: ${productData.shippingLocation}`);
+
+      // 计算必要的PDA - 使用当前商户地址
+      const [globalRootPDA] = this.calculatePDA(["global_id_root"]);
+      const [merchantIdAccountPDA] = this.calculatePDA(["merchant_id", merchantPubkey.toBuffer()]);
+      const [paymentConfigPDA] = this.calculatePDA(["payment_config"]);
+
+      // 获取活跃块信息
+      let activeChunkPDA: PublicKey;
+      try {
+        const merchantIdAccount = await this.program.account.merchantIdAccount.fetch(
+          merchantIdAccountPDA
+        );
+        activeChunkPDA = merchantIdAccount.activeChunk;
+        console.log(`   🔗 使用活跃块: ${activeChunkPDA.toString()}`);
+      } catch (error) {
+        console.log(`   ⚠️ 无法获取活跃块信息，计算默认块PDA`);
+        const [defaultChunkPDA] = this.calculatePDA([
+          "id_chunk",
+          merchantPubkey.toBuffer(),
+          Buffer.from([0]),
+        ]);
+        activeChunkPDA = defaultChunkPDA;
+        console.log(`   🔗 使用默认块: ${activeChunkPDA.toString()}`);
+      }
+
+      // 预先获取下一个产品ID
+      let nextProductId: number;
+      try {
+        const activeChunk = await this.program.account.idChunk.fetch(activeChunkPDA);
+        const nextLocalId = activeChunk.nextAvailable;
+        nextProductId =
+          activeChunk.startId.toNumber() +
+          (typeof nextLocalId === "object" && nextLocalId && "toNumber" in nextLocalId
+            ? (nextLocalId as any).toNumber()
+            : nextLocalId);
+        console.log(`   🆔 预计算产品ID: ${nextProductId}`);
+      } catch (error) {
+        const timestamp = Date.now();
+        nextProductId = 10000 + (timestamp % 90000);
+        console.log(`   🆔 兼容性模式产品ID: ${nextProductId}`);
+      }
+
+      // 计算产品账户PDA
+      const productIdBytes = new anchor.BN(nextProductId).toArray("le", 8);
+      const [productAccountPDA] = this.calculatePDA(["product", Buffer.from(productIdBytes)]);
+
+      console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
+
+      // 调用createProductBase指令
+      console.log(`   🚀 调用createProductBase指令...`);
+
+      const signature = await this.program.methods
+        .createProductBase(
+          productData.name,
+          productData.description,
+          productData.price,
+          productData.keywords,
+          productData.inventory,
+          productData.paymentToken,
+          productData.shippingLocation
+        )
+        .accounts({
+          merchant: merchantPubkey,
+          globalRoot: globalRootPDA,
+          merchantIdAccount: merchantIdAccountPDA,
+          activeChunk: activeChunkPDA,
+          paymentConfig: paymentConfigPDA,
+          productAccount: productAccountPDA,
+          systemProgram: SystemProgram.programId,
+        } as any)
+        .signers([merchantKeypair])
+        .rpc();
+
+      await this.connection.confirmTransaction(signature);
+
+      console.log(`   ✅ 基于1.txt的产品创建成功！`);
+      console.log(`   📝 交易签名: ${signature}`);
+      console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
+      console.log(`   🆔 产品ID: ${nextProductId}`);
+
+      // 保存到创建的产品列表
+      this.createdProducts.push(productAccountPDA);
+      this.createdProductIds.push(nextProductId);
+    } catch (error) {
+      console.error(`   ❌ 基于1.txt的产品创建失败: ${(error as Error).message}`);
       console.log(`   ⚠️ 继续执行后续步骤`);
     }
   }

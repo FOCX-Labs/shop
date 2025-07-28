@@ -437,10 +437,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -912,10 +909,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -1059,10 +1053,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -1757,10 +1748,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -1875,6 +1863,61 @@
           "type": "bool"
         }
       ]
+    },
+    {
+      "name": "force_close_system_config",
+      "discriminator": [
+        189,
+        71,
+        100,
+        160,
+        167,
+        174,
+        235,
+        108
+      ],
+      "accounts": [
+        {
+          "name": "system_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  121,
+                  115,
+                  116,
+                  101,
+                  109,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "beneficiary",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "authority",
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "generate_product_id",
@@ -2021,10 +2064,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -2609,10 +2649,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -2757,10 +2794,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -3145,10 +3179,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -3513,10 +3544,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -4196,10 +4224,7 @@
                   110,
                   102,
                   105,
-                  103,
-                  95,
-                  118,
-                  50
+                  103
                 ]
               }
             ]
@@ -4477,488 +4502,148 @@
   "errors": [
     {
       "code": 6000,
-      "name": "MissingKeywordAccount",
-      "msg": "缺少关键词账户"
+      "name": "EmptyProductName",
+      "msg": "Product name cannot be empty"
     },
     {
       "code": 6001,
-      "name": "TooManyKeywords",
-      "msg": "关键词数量超出限制"
+      "name": "ProductNameTooLong",
+      "msg": "Product name too long"
     },
     {
       "code": 6002,
-      "name": "ShardFull",
-      "msg": "分片空间不足"
+      "name": "InvalidProductName",
+      "msg": "Invalid product name"
     },
     {
       "code": 6003,
-      "name": "IdGenerationFailed",
-      "msg": "ID生成失败"
+      "name": "DescriptionTooLong",
+      "msg": "Description too long"
     },
     {
       "code": 6004,
-      "name": "RentCalculationFailed",
-      "msg": "租金计算失败"
+      "name": "InvalidPrice",
+      "msg": "Invalid price"
     },
     {
       "code": 6005,
-      "name": "MerchantNotRegistered",
-      "msg": "商户未注册"
+      "name": "PriceTooHigh",
+      "msg": "Price too high"
     },
     {
       "code": 6006,
-      "name": "IdAlreadyInUse",
-      "msg": "ID已被使用"
+      "name": "EmptyKeyword",
+      "msg": "Keyword cannot be empty"
     },
     {
       "code": 6007,
-      "name": "IdNotFound",
-      "msg": "ID不存在"
+      "name": "KeywordTooLong",
+      "msg": "Keyword too long"
     },
     {
       "code": 6008,
-      "name": "IdRangeOverflow",
-      "msg": "ID区间超出范围"
+      "name": "InvalidKeyword",
+      "msg": "Invalid keyword"
     },
     {
       "code": 6009,
-      "name": "NoAvailableId",
-      "msg": "无可用ID"
+      "name": "KeywordContainsSpace",
+      "msg": "Keyword cannot contain spaces"
     },
     {
       "code": 6010,
-      "name": "InvalidId",
-      "msg": "无效的ID"
+      "name": "NoKeywords",
+      "msg": "No keywords provided"
     },
     {
       "code": 6011,
-      "name": "IntegerOverflow",
-      "msg": "整数溢出"
+      "name": "TooManyKeywords",
+      "msg": "Too many keywords"
     },
     {
       "code": 6012,
-      "name": "ProductNotFound",
-      "msg": "商品不存在"
+      "name": "DuplicateKeyword",
+      "msg": "Duplicate keyword"
     },
     {
       "code": 6013,
-      "name": "InvalidProduct",
-      "msg": "无效的商品"
+      "name": "EmptyMerchantName",
+      "msg": "Merchant name cannot be empty"
     },
     {
       "code": 6014,
-      "name": "InvalidProductAccount",
-      "msg": "无效的商品账户"
+      "name": "MerchantNameTooLong",
+      "msg": "Merchant name too long"
     },
     {
       "code": 6015,
-      "name": "InvalidPrice",
-      "msg": "无效的价格"
+      "name": "InvalidMerchantName",
+      "msg": "Invalid merchant name"
     },
     {
       "code": 6016,
-      "name": "InvalidAmount",
-      "msg": "购买数量必须大于0"
+      "name": "EmptyEmail",
+      "msg": "Email cannot be empty"
     },
     {
       "code": 6017,
-      "name": "InvalidProductName",
-      "msg": "无效的商品名称"
+      "name": "EmailTooLong",
+      "msg": "Email too long"
     },
     {
       "code": 6018,
-      "name": "InvalidProductNameLength",
-      "msg": "无效的商品名称长度"
+      "name": "InvalidEmailFormat",
+      "msg": "Invalid email format"
     },
     {
       "code": 6019,
-      "name": "InvalidProductDescription",
-      "msg": "无效的商品描述"
+      "name": "UrlTooLong",
+      "msg": "URL too long"
     },
     {
       "code": 6020,
-      "name": "InvalidProductDescriptionLength",
-      "msg": "无效的商品描述长度"
+      "name": "InvalidUrlFormat",
+      "msg": "Invalid URL format"
     },
     {
       "code": 6021,
-      "name": "TooManyImageUrls",
-      "msg": "图片URL数量过多"
+      "name": "StockTooHigh",
+      "msg": "Stock too high"
     },
     {
       "code": 6022,
-      "name": "TooManySalesRegions",
-      "msg": "销售区域数量过多"
+      "name": "SalesTooHigh",
+      "msg": "Sales count too high"
     },
     {
       "code": 6023,
-      "name": "TooManyLogisticsMethods",
-      "msg": "物流方式数量过多"
+      "name": "InvalidRating",
+      "msg": "Invalid rating"
     },
     {
       "code": 6024,
-      "name": "InvalidMerchant",
-      "msg": "无效的商户"
+      "name": "InvalidShardId",
+      "msg": "Invalid shard ID"
     },
     {
       "code": 6025,
-      "name": "InvalidMerchantNameLength",
-      "msg": "无效的商户名称长度"
+      "name": "InvalidProductId",
+      "msg": "Invalid product ID"
     },
     {
       "code": 6026,
-      "name": "InvalidMerchantDescriptionLength",
-      "msg": "无效的商户描述长度"
+      "name": "InvalidMerchantId",
+      "msg": "Invalid merchant ID"
     },
     {
       "code": 6027,
-      "name": "UnauthorizedMerchant",
-      "msg": "未授权的商户操作"
+      "name": "InvalidPriceRange",
+      "msg": "Invalid price range"
     },
     {
       "code": 6028,
-      "name": "InvalidKeyword",
-      "msg": "无效的关键词"
-    },
-    {
-      "code": 6029,
-      "name": "InvalidKeywordLength",
-      "msg": "无效的关键词长度"
-    },
-    {
-      "code": 6030,
-      "name": "InvalidKeywordCount",
-      "msg": "无效的关键词数量"
-    },
-    {
-      "code": 6031,
-      "name": "DuplicateKeyword",
-      "msg": "重复的关键词"
-    },
-    {
-      "code": 6032,
-      "name": "ShardIsFull",
-      "msg": "分片已满"
-    },
-    {
-      "code": 6033,
-      "name": "InvalidShardIndex",
-      "msg": "无效的分片索引"
-    },
-    {
-      "code": 6034,
-      "name": "PriceIndexNodeNotFound",
-      "msg": "价格索引节点不存在"
-    },
-    {
-      "code": 6035,
-      "name": "SalesIndexNodeNotFound",
-      "msg": "销量索引节点不存在"
-    },
-    {
-      "code": 6036,
-      "name": "InvalidPriceRange",
-      "msg": "无效的价格区间"
-    },
-    {
-      "code": 6037,
       "name": "InvalidSalesRange",
-      "msg": "无效的销量区间"
-    },
-    {
-      "code": 6038,
-      "name": "BloomFilterUpdateFailed",
-      "msg": "布隆过滤器更新失败"
-    },
-    {
-      "code": 6039,
-      "name": "KeywordIndexNotEmpty",
-      "msg": "关键词索引不为空"
-    },
-    {
-      "code": 6040,
-      "name": "KeywordShardNotEmpty",
-      "msg": "关键词分片不为空"
-    },
-    {
-      "code": 6041,
-      "name": "MerchantHasActiveProducts",
-      "msg": "商户仍有活跃产品"
-    },
-    {
-      "code": 6042,
-      "name": "IdChunkNotEmpty",
-      "msg": "ID块不为空"
-    },
-    {
-      "code": 6043,
-      "name": "MerchantIdAccountNotEmpty",
-      "msg": "商户ID账户不为空"
-    },
-    {
-      "code": 6044,
-      "name": "UnsupportedToken",
-      "msg": "不支持的代币"
-    },
-    {
-      "code": 6045,
-      "name": "InsufficientTokenBalance",
-      "msg": "代币余额不足"
-    },
-    {
-      "code": 6046,
-      "name": "InsufficientSolBalance",
-      "msg": "SOL余额不足"
-    },
-    {
-      "code": 6047,
-      "name": "InvalidTokenAmount",
-      "msg": "无效的代币金额"
-    },
-    {
-      "code": 6048,
-      "name": "TokenTransferFailed",
-      "msg": "代币转账失败"
-    },
-    {
-      "code": 6049,
-      "name": "FeeCalculationError",
-      "msg": "手续费计算错误"
-    },
-    {
-      "code": 6050,
-      "name": "PaymentConfigNotFound",
-      "msg": "支付配置未找到"
-    },
-    {
-      "code": 6051,
-      "name": "TokenNotActive",
-      "msg": "代币未激活"
-    },
-    {
-      "code": 6052,
-      "name": "BelowMinimumAmount",
-      "msg": "低于最小交易金额"
-    },
-    {
-      "code": 6053,
-      "name": "ProductCreationFailed",
-      "msg": "商品创建失败"
-    },
-    {
-      "code": 6054,
-      "name": "AtomicOperationFailed",
-      "msg": "原子操作失败"
-    },
-    {
-      "code": 6055,
-      "name": "InvalidFeeRate",
-      "msg": "无效的手续费率"
-    },
-    {
-      "code": 6056,
-      "name": "TooManyTokens",
-      "msg": "代币数量过多"
-    },
-    {
-      "code": 6057,
-      "name": "InvalidTokenSymbol",
-      "msg": "无效的代币符号"
-    },
-    {
-      "code": 6058,
-      "name": "InvalidTokenDecimals",
-      "msg": "无效的代币精度"
-    },
-    {
-      "code": 6059,
-      "name": "InvalidOrderStatus",
-      "msg": "无效的订单状态"
-    },
-    {
-      "code": 6060,
-      "name": "InvalidPaymentMethod",
-      "msg": "无效的支付方式"
-    },
-    {
-      "code": 6061,
-      "name": "OrderNotFound",
-      "msg": "订单不存在"
-    },
-    {
-      "code": 6062,
-      "name": "InvalidOrderQuantity",
-      "msg": "无效的订单数量"
-    },
-    {
-      "code": 6063,
-      "name": "InvalidOrderPrice",
-      "msg": "无效的订单价格"
-    },
-    {
-      "code": 6064,
-      "name": "InvalidOrderTotalAmount",
-      "msg": "无效的订单总金额"
-    },
-    {
-      "code": 6065,
-      "name": "InvalidOrderTokenPrice",
-      "msg": "无效的订单代币价格"
-    },
-    {
-      "code": 6066,
-      "name": "InvalidOrderTokenTotalAmount",
-      "msg": "无效的订单代币总金额"
-    },
-    {
-      "code": 6067,
-      "name": "InvalidShippingAddressLength",
-      "msg": "无效的收货地址长度"
-    },
-    {
-      "code": 6068,
-      "name": "InvalidOrderNotesLength",
-      "msg": "无效的订单备注长度"
-    },
-    {
-      "code": 6069,
-      "name": "InvalidTransactionSignature",
-      "msg": "无效的交易签名"
-    },
-    {
-      "code": 6070,
-      "name": "InvalidOrderStatusTransition",
-      "msg": "无效的订单状态转换"
-    },
-    {
-      "code": 6071,
-      "name": "OrderCannotBeModified",
-      "msg": "订单无法修改"
-    },
-    {
-      "code": 6072,
-      "name": "OrderCannotBeRefunded",
-      "msg": "订单无法退款"
-    },
-    {
-      "code": 6073,
-      "name": "OrderAlreadyExists",
-      "msg": "订单已存在"
-    },
-    {
-      "code": 6074,
-      "name": "Unauthorized",
-      "msg": "未授权操作"
-    },
-    {
-      "code": 6075,
-      "name": "InvalidTimestamp",
-      "msg": "无效的时间戳"
-    },
-    {
-      "code": 6076,
-      "name": "InvalidAccountOwner",
-      "msg": "无效的账户所有者"
-    },
-    {
-      "code": 6077,
-      "name": "InvalidAccountData",
-      "msg": "无效的账户数据"
-    },
-    {
-      "code": 6078,
-      "name": "InvalidAccountSize",
-      "msg": "无效的账户大小"
-    },
-    {
-      "code": 6079,
-      "name": "InvalidPda",
-      "msg": "无效的PDA"
-    },
-    {
-      "code": 6080,
-      "name": "InvalidAccountSeeds",
-      "msg": "无效的账户种子"
-    },
-    {
-      "code": 6081,
-      "name": "InvalidAccountBump",
-      "msg": "无效的账户bump"
-    },
-    {
-      "code": 6082,
-      "name": "InsufficientFunds",
-      "msg": "余额不足"
-    },
-    {
-      "code": 6083,
-      "name": "InvalidActiveChunk",
-      "msg": "无效的活跃块"
-    },
-    {
-      "code": 6084,
-      "name": "AccountDiscriminatorMismatch",
-      "msg": "账户判别器不匹配"
-    },
-    {
-      "code": 6085,
-      "name": "InsufficientAccounts",
-      "msg": "账户数量不足"
-    },
-    {
-      "code": 6086,
-      "name": "InsufficientDeposit",
-      "msg": "保证金不足"
-    },
-    {
-      "code": 6087,
-      "name": "InsufficientLockedDeposit",
-      "msg": "锁定保证金不足"
-    },
-    {
-      "code": 6088,
-      "name": "InvalidDepositToken",
-      "msg": "无效的保证金代币"
-    },
-    {
-      "code": 6089,
-      "name": "InvalidDepositAmount",
-      "msg": "保证金金额无效"
-    },
-    {
-      "code": 6090,
-      "name": "MerchantDepositInsufficient",
-      "msg": "商户保证金不足，无法进行交易"
-    },
-    {
-      "code": 6091,
-      "name": "DepositAlreadyLocked",
-      "msg": "保证金已锁定"
-    },
-    {
-      "code": 6092,
-      "name": "DepositNotLocked",
-      "msg": "保证金未锁定"
-    },
-    {
-      "code": 6093,
-      "name": "ArithmeticOverflow",
-      "msg": "算术溢出"
-    },
-    {
-      "code": 6094,
-      "name": "ArithmeticUnderflow",
-      "msg": "算术下溢"
-    },
-    {
-      "code": 6095,
-      "name": "TrackingNumberRequired",
-      "msg": "发货时必须提供物流单号"
-    },
-    {
-      "code": 6096,
-      "name": "InvalidTrackingNumber",
-      "msg": "无效的物流单号"
+      "msg": "Invalid sales range"
     }
   ],
   "types": [
