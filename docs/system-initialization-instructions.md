@@ -194,6 +194,64 @@ pub fn initialize_system_config(
 
 -   `config: SystemConfig` - 完整的系统配置
 
+### 3. initialize_payment_system
+
+#### 📝 功能描述
+
+初始化支付系统配置，设置平台支持的 Token 类型、手续费率和收费账户。
+
+#### 📊 IDL 信息
+
+-   **指令名**: `initialize_payment_system`
+-   **Discriminator**: `[115, 181, 85, 189, 43, 0, 123, 183]`
+
+#### 🏦 账户结构
+
+```rust
+#[derive(Accounts)]
+pub struct InitializePaymentSystem<'info> {
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + PaymentConfig::INIT_SPACE,
+        seeds = [b"payment_config"],
+        bump
+    )]
+    pub payment_config: Account<'info, PaymentConfig>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+```
+
+**账户说明**:
+
+-   `payment_config` (mut, PDA) - 支付配置账户，PDA 种子: `["payment_config"]`
+-   `payer` (mut, signer) - 支付账户
+-   `authority` (signer) - 权限账户
+-   `system_program` - Solana 系统程序
+
+#### 📊 指令参数
+
+```rust
+pub fn initialize_payment_system(
+    ctx: Context<InitializePaymentSystem>,
+    supported_tokens: Vec<SupportedToken>,
+    fee_rate: u16,
+    fee_recipient: Pubkey,
+) -> Result<()>
+```
+
+**参数详解**:
+
+-   `supported_tokens: Vec<SupportedToken>` - 支持的 Token 列表
+-   `fee_rate: u16` - 手续费率 (基点)
+-   `fee_recipient: Pubkey` - 手续费接收账户
+
 ## 📋 初始化顺序和依赖关系
 
 ### 核心系统初始化顺序
@@ -207,8 +265,14 @@ pub fn initialize_system_config(
     ```
 
 2. **第二阶段 - 系统配置**:
+
     ```
     initialize_system_config
+    ```
+
+3. **第三阶段 - 支付系统**:
+    ```
+    initialize_payment_system
     ```
 
 ### 依赖关系图
@@ -217,12 +281,15 @@ pub fn initialize_system_config(
 initialize_system (全局ID根)
     ↓
 initialize_system_config (系统配置)
+    ↓
+initialize_payment_system (支付配置)
 ```
 
 **说明**:
 
 -   **initialize_system** 必须首先执行，建立全局 ID 管理系统
 -   **initialize_system_config** 在系统根账户创建后执行，设置平台配置参数
+-   **initialize_payment_system** 在系统配置完成后执行，设置支付相关配置
 
 ## 💡 TypeScript 使用示例
 
@@ -245,6 +312,9 @@ export class SystemInitializer {
 
         // 2. 初始化系统配置
         await this.initializeSystemConfig();
+
+        // 3. 初始化支付系统
+        await this.initializePaymentSystem();
 
         console.log("核心系统初始化完成！");
     }
@@ -312,6 +382,38 @@ export class SystemInitializer {
 
         console.log("✅ 系统配置初始化完成");
     }
+
+    private async initializePaymentSystem(): Promise<void> {
+        const supportedTokens = [
+            {
+                mint: this.tokenMint,
+                decimals: 9,
+                symbol: "DXDV",
+                name: "Demo Token",
+            },
+        ];
+
+        const [paymentConfigPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+            [Buffer.from("payment_config")],
+            this.program.programId
+        );
+
+        await this.program.methods
+            .initializePaymentSystem(
+                supportedTokens,
+                40, // 0.4% fee rate
+                this.provider.wallet.publicKey
+            )
+            .accounts({
+                paymentConfig: paymentConfigPDA,
+                payer: this.provider.wallet.publicKey,
+                authority: this.provider.wallet.publicKey,
+                systemProgram: anchor.web3.SystemProgram.programId,
+            })
+            .rpc();
+
+        console.log("✅ 支付系统初始化完成");
+    }
 }
 ```
 
@@ -340,12 +442,13 @@ export class SystemInitializer {
 
 ## 📝 总结
 
-本文档基于当前的 IDL 和代码实现，提供了 Solana 电商平台核心系统初始化的指南。文档涵盖了最基础的两个初始化指令，这些指令是平台运行的核心基础。
+本文档基于当前的 IDL 和代码实现，提供了 Solana 电商平台核心系统初始化的指南。文档涵盖了最基础的三个初始化指令，这些指令是平台运行的核心基础。
 
 **核心初始化指令**:
 
 1. **initialize_system** - 建立全局 ID 管理系统
 2. **initialize_system_config** - 设置平台配置参数
+3. **initialize_payment_system** - 设置支付系统配置
 
 在实际部署时，建议：
 
