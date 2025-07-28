@@ -1,8 +1,8 @@
-# Solana 电商平台系统初始化指令文档
+# Solana电商平台系统初始化指令文档
 
 ## 📋 概述
 
-本文档详细描述了 Solana 电商平台的三个核心系统级初始化指令，这些指令必须在系统启动时按顺序执行，用于建立平台的基础架构和配置。
+本文档详细描述了Solana电商平台的系统初始化指令，基于当前IDL和代码实现。这些指令必须在系统启动时按顺序执行，用于建立平台的基础架构和配置。
 
 ## 🏗️ 系统初始化指令
 
@@ -10,20 +10,12 @@
 
 #### 📝 功能描述
 
-初始化全局系统根账户，建立平台的核心 ID 管理系统和基础配置。这是整个系统的第一个指令，必须最先执行。
+初始化全局系统根账户，建立平台的核心ID管理系统和基础配置。这是整个系统的第一个指令，必须最先执行。
 
-#### 📊 指令参数
+#### 📊 IDL信息
 
-```rust
-pub fn initialize_system(
-    ctx: Context<InitializeSystem>,
-    config: SystemConfig
-) -> Result<()>
-```
-
-**参数详解**:
-
--   `config: SystemConfig` - 系统配置对象，包含平台的核心配置参数
+- **指令名**: `initialize_system`
+- **Discriminator**: `[50, 173, 248, 140, 202, 35, 141, 150]`
 
 #### 🏦 账户结构
 
@@ -47,39 +39,49 @@ pub struct InitializeSystem<'info> {
 ```
 
 **账户说明**:
+- `payer` (mut, signer) - 支付账户，负责支付账户创建费用
+- `global_root` (mut, PDA) - 全局根账户，PDA种子: `["global_id_root"]`
+- `system_program` - Solana系统程序，用于创建账户
 
--   `payer` (mut, signer) - 支付账户，负责支付账户创建费用
--   `global_root` (mut, PDA) - 全局根账户，PDA 种子: `["global_id_root"]`
--   `system_program` - Solana 系统程序，用于创建账户
+#### 📊 指令参数
 
-#### 🔧 SystemConfig 参数详解
+```rust
+pub fn initialize_system(
+    ctx: Context<InitializeSystem>,
+    config: SystemConfig
+) -> Result<()>
+```
+
+**参数详解**:
+- `config: SystemConfig` - 系统配置对象，包含平台的核心配置参数
+
+#### 🔧 SystemConfig结构
 
 ```rust
 pub struct SystemConfig {
     pub authority: Pubkey,                    // 系统管理员地址
-    pub max_products_per_shard: u16,         // 每个分片最大产品数 (建议: 1000)
-    pub max_keywords_per_product: u8,        // 每个产品最大关键词数 (建议: 10)
-    pub chunk_size: u32,                     // ID块大小 (建议: 1000)
-    pub bloom_filter_size: u16,              // 布隆过滤器大小 (建议: 1024)
-    pub merchant_deposit_required: u64,      // 商户保证金要求 (基础单位)
+    pub max_products_per_shard: u16,         // 每个分片最大产品数 (默认: 100)
+    pub max_keywords_per_product: u8,        // 每个产品最大关键词数 (默认: 10)
+    pub chunk_size: u32,                     // ID块大小 (默认: 10,000)
+    pub bloom_filter_size: u16,              // 布隆过滤器大小 (默认: 256)
+    pub merchant_deposit_required: u64,      // 商户保证金要求 (默认: 1000)
     pub deposit_token_mint: Pubkey,          // 保证金Token mint地址
-    pub platform_fee_rate: u16,             // 平台手续费率 (基点, 250 = 2.5%)
+    pub platform_fee_rate: u16,             // 平台手续费率 (基点, 默认: 40 = 0.4%)
     pub platform_fee_recipient: Pubkey,     // 平台手续费接收账户
-    pub auto_confirm_days: u32,              // 自动确认收货天数 (建议: 7)
+    pub auto_confirm_days: u32,              // 自动确认收货天数 (默认: 30)
     pub external_program_id: Pubkey,         // 外部程序ID (用于CPI调用)
 }
 ```
 
 #### 🎯 创建的状态账户
 
-**GlobalIdRoot 账户结构**:
-
+**GlobalIdRoot账户结构**:
 ```rust
 pub struct GlobalIdRoot {
     pub last_merchant_id: u32,              // 最后分配的商户ID
     pub last_global_id: u64,                // 最后分配的全局ID
     pub chunk_size: u32,                    // ID块大小
-    pub merchants: Vec<Pubkey>,             // 商户列表 (最多100个)
+    pub merchants: Vec<Pubkey>,             // 商户列表
     pub max_products_per_shard: u16,        // 每个分片最大产品数
     pub max_keywords_per_product: u8,       // 每个产品最大关键词数
     pub bloom_filter_size: u16,             // 布隆过滤器大小
@@ -87,41 +89,94 @@ pub struct GlobalIdRoot {
 }
 ```
 
-#### 💡 使用示例
-
-```typescript
-const systemConfig = {
-    authority: authorityPublicKey,
-    maxProductsPerShard: 1000,
-    maxKeywordsPerProduct: 10,
-    chunkSize: 1000,
-    bloomFilterSize: 1024,
-    merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, 9)), // 1000 tokens
-    depositTokenMint: tokenMintPublicKey,
-    platformFeeRate: 250, // 2.5%
-    platformFeeRecipient: feeRecipientPublicKey,
-    autoConfirmDays: 7,
-    externalProgramId: externalProgramPublicKey,
-};
-
-const signature = await program.methods
-    .initializeSystem(systemConfig)
-    .accounts({
-        payer: payer.publicKey,
-        globalRoot: globalRootPDA,
-        systemProgram: SystemProgram.programId,
-    })
-    .signers([payer])
-    .rpc();
-```
-
----
-
-### 2. initialize_payment_system
+### 2. initialize_system_config
 
 #### 📝 功能描述
 
-初始化支付系统配置，设置平台支持的 Token 类型、手续费率和收费账户。这个指令建立了平台的支付基础设施。
+初始化系统配置账户，存储平台的全局配置信息。这个账户与GlobalIdRoot分离，提供更灵活的配置管理。
+
+#### 📊 IDL信息
+
+- **指令名**: `initialize_system_config`
+- **Discriminator**: `[43, 153, 196, 116, 233, 36, 208, 246]`
+
+#### 🏦 账户结构
+
+```rust
+#[derive(Accounts)]
+pub struct InitializeSystemConfig<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + std::mem::size_of::<SystemConfig>(),
+        seeds = [b"system_config_v2"],
+        bump
+    )]
+    pub system_config: Account<'info, SystemConfig>,
+
+    pub system_program: Program<'info, System>,
+}
+```
+
+**账户说明**:
+- `payer` (mut, signer) - 支付账户
+- `system_config` (mut, PDA) - 系统配置账户，PDA种子: `["system_config_v2"]`
+- `system_program` - Solana系统程序
+
+#### 📊 指令参数
+
+```rust
+pub fn initialize_system_config(
+    ctx: Context<InitializeSystemConfig>,
+    config: SystemConfig,
+) -> Result<()>
+```
+
+**参数详解**:
+- `config: SystemConfig` - 完整的系统配置
+
+### 3. initialize_payment_system
+
+#### 📝 功能描述
+
+初始化支付系统配置，设置平台支持的Token类型、手续费率和收费账户。
+
+#### 📊 IDL信息
+
+- **指令名**: `initialize_payment_system`
+- **Discriminator**: `[115, 181, 85, 189, 43, 0, 123, 183]`
+
+#### 🏦 账户结构
+
+```rust
+#[derive(Accounts)]
+pub struct InitializePaymentSystem<'info> {
+    #[account(
+        init,
+        payer = payer,
+        space = 8 + PaymentConfig::INIT_SPACE,
+        seeds = [b"payment_config"],
+        bump
+    )]
+    pub payment_config: Account<'info, PaymentConfig>,
+
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    pub authority: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+```
+
+**账户说明**:
+- `payment_config` (mut, PDA) - 支付配置账户，PDA种子: `["payment_config"]`
+- `payer` (mut, signer) - 支付账户
+- `authority` (signer) - 权限账户
+- `system_program` - Solana系统程序
 
 #### 📊 指令参数
 
@@ -135,428 +190,327 @@ pub fn initialize_payment_system(
 ```
 
 **参数详解**:
+- `supported_tokens: Vec<SupportedToken>` - 支持的Token列表
+- `fee_rate: u16` - 手续费率 (基点)
+- `fee_recipient: Pubkey` - 手续费接收账户
 
--   `supported_tokens: Vec<SupportedToken>` - 支持的 Token 列表 (最多 10 个)
--   `fee_rate: u16` - 手续费率，以基点为单位 (100 = 1%, 最大 10000 = 100%)
--   `fee_recipient: Pubkey` - 手续费接收账户地址
+### 4. initialize_program_token_account
+
+#### 📝 功能描述
+
+初始化程序的Token账户，用于托管用户资金。
+
+#### 📊 IDL信息
+
+- **指令名**: `initialize_program_token_account`
+- **Discriminator**: `[195, 68, 47, 163, 248, 214, 47, 175]`
 
 #### 🏦 账户结构
 
 ```rust
 #[derive(Accounts)]
-pub struct InitializePaymentSystem<'info> {
+pub struct InitializeProgramTokenAccount<'info> {
     #[account(
         init,
-        payer = authority,
-        space = 8 + PaymentConfig::INIT_SPACE,
-        seeds = [b"payment_config"],
-        bump
+        payer = payer,
+        space = TokenAccount::LEN,
+        seeds = [b"program_token_account", payment_token_mint.key().as_ref()],
+        bump,
+        token::mint = payment_token_mint,
+        token::authority = program_authority,
     )]
-    pub payment_config: Account<'info, PaymentConfig>,
+    pub program_token_account: Account<'info, TokenAccount>,
 
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub payer: Signer<'info>,
 
+    pub payment_token_mint: Account<'info, Mint>,
+
+    /// CHECK: 程序权限账户，通过PDA验证
+    #[account(
+        seeds = [b"program_authority"],
+        bump
+    )]
+    pub program_authority: AccountInfo<'info>,
+
+    pub rent: Sysvar<'info, Rent>,
+    pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
 }
 ```
 
-**账户说明**:
+**PDA种子**:
+- Token账户: `["program_token_account", token_mint.key()]`
+- 权限账户: `["program_authority"]`
 
--   `payment_config` (mut, PDA) - 支付配置账户，PDA 种子: `["payment_config"]`
--   `authority` (mut, signer) - 权限账户，负责支付账户创建费用
--   `system_program` - Solana 系统程序
-
-#### 🪙 SupportedToken 结构
-
-```rust
-pub struct SupportedToken {
-    pub mint: Pubkey,           // Token mint地址
-    pub symbol: String,         // Token符号 (如 "USDC", "SOL")
-    pub decimals: u8,           // Token精度
-    pub is_active: bool,        // 是否激活
-    pub min_amount: u64,        // 最小交易金额
-    pub max_amount: u64,        // 最大交易金额
-}
-```
-
-#### 🎯 创建的状态账户
-
-**PaymentConfig 账户结构**:
-
-```rust
-pub struct PaymentConfig {
-    pub authority: Pubkey,                   // 系统管理员
-    pub supported_tokens: Vec<SupportedToken>, // 支持的Token列表 (最多10个)
-    pub fee_rate: u16,                       // 手续费率 (基点)
-    pub fee_recipient: Pubkey,               // 手续费接收方
-    pub created_at: i64,                     // 创建时间
-    pub updated_at: i64,                     // 更新时间
-    pub bump: u8,                            // PDA bump
-}
-```
-
-#### 💡 使用示例
-
-```typescript
-const supportedTokens = [
-    {
-        mint: tokenMintPublicKey,
-        symbol: "LOCAL",
-        decimals: 9,
-        isActive: true,
-        minAmount: new anchor.BN(1000000), // 0.001 tokens
-        maxAmount: new anchor.BN(1000000000000), // 1M tokens
-    },
-];
-
-const signature = await program.methods
-    .initializePaymentSystem(
-        supportedTokens,
-        250, // 2.5% fee rate
-        feeRecipientPublicKey
-    )
-    .accounts({
-        paymentConfig: paymentConfigPDA,
-        authority: authority.publicKey,
-        systemProgram: SystemProgram.programId,
-    })
-    .signers([authority])
-    .rpc();
-```
-
----
-
-### 3. initialize_order_stats
+### 5. initialize_order_stats
 
 #### 📝 功能描述
 
-初始化订单统计系统，创建全局订单统计账户用于跟踪平台的订单数据和收入统计。
+初始化订单统计账户，用于跟踪平台的订单数据。
 
-#### 📊 指令参数
+#### 📊 IDL信息
 
-```rust
-pub fn initialize_order_stats(ctx: Context<InitializeOrderStats>) -> Result<()>
-```
-
-**参数详解**:
-
--   无参数
+- **指令名**: `initialize_order_stats`
+- **Discriminator**: `[188, 141, 99, 39, 119, 215, 43, 254]`
 
 #### 🏦 账户结构
 
 ```rust
 #[derive(Accounts)]
 pub struct InitializeOrderStats<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
     #[account(
         init,
-        payer = authority,
+        payer = payer,
         space = 8 + OrderStats::INIT_SPACE,
         seeds = [b"order_stats"],
         bump
     )]
     pub order_stats: Account<'info, OrderStats>,
 
+    pub system_program: Program<'info, System>,
+}
+```
+
+**PDA种子**: `["order_stats"]`
+
+**初始化内容**:
+- `total_orders`: 0 - 总订单数
+- `pending_orders`: 0 - 待处理订单数
+- `shipped_orders`: 0 - 已发货订单数
+- `delivered_orders`: 0 - 已送达订单数
+- `refunded_orders`: 0 - 已退款订单数
+- `total_revenue`: 0 - 总收入
+
+## 🔍 搜索索引初始化 (按需)
+
+### 6. initialize_keyword_index
+
+#### 📝 功能描述
+
+初始化关键词搜索索引，支持产品的关键词搜索。使用`init_if_needed`模式。
+
+#### 📊 IDL信息
+
+- **指令名**: `initialize_keyword_index`
+- **Discriminator**: `[36, 128, 212, 91, 103, 123, 46, 6]`
+
+#### 🏦 账户结构
+
+```rust
+#[derive(Accounts)]
+#[instruction(keyword: String)]
+pub struct InitializeKeywordIndexIfNeeded<'info> {
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + KeywordRoot::INIT_SPACE,
+        seeds = [b"keyword_root", keyword.as_bytes()],
+        bump
+    )]
+    pub keyword_root: Account<'info, KeywordRoot>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + KeywordShard::INIT_SPACE,
+        seeds = [b"keyword_shard", keyword.as_bytes(), 0u32.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub first_shard: Account<'info, KeywordShard>,
+
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub payer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }
 ```
 
-**账户说明**:
+**PDA种子**:
+- 根账户: `["keyword_root", keyword.as_bytes()]`
+- 分片账户: `["keyword_shard", keyword.as_bytes(), shard_index.to_le_bytes()]`
 
--   `order_stats` (mut, PDA) - 订单统计账户，PDA 种子: `["order_stats"]`
--   `authority` (mut, signer) - 权限账户，负责支付账户创建费用
--   `system_program` - Solana 系统程序
+### 7. initialize_sales_index
 
-#### 🎯 创建的状态账户
+#### 📝 功能描述
 
-**OrderStats 账户结构**:
+初始化销量索引，支持按销量排序的产品搜索。
+
+#### 📊 IDL信息
+
+- **指令名**: `initialize_sales_index`
+- **Discriminator**: `[225, 105, 245, 176, 194, 41, 219, 31]`
+
+#### 🏦 账户结构
 
 ```rust
-pub struct OrderStats {
-    pub total_orders: u64,      // 总订单数
-    pub pending_orders: u64,    // 待处理订单数
-    pub shipped_orders: u64,    // 已发货订单数
-    pub delivered_orders: u64,  // 已送达订单数
-    pub refunded_orders: u64,   // 已退款订单数
-    pub total_revenue: u64,     // 总收入 (以最小Token单位计算)
-    pub bump: u8,               // PDA bump
+#[derive(Accounts)]
+#[instruction(sales_range_start: u32, sales_range_end: u32)]
+pub struct InitializeSalesIndexIfNeeded<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = 8 + SalesIndexNode::INIT_SPACE,
+        seeds = [
+            b"sales_index",
+            sales_range_start.to_le_bytes().as_ref(),
+            sales_range_end.to_le_bytes().as_ref()
+        ],
+        bump
+    )]
+    pub sales_index: Account<'info, SalesIndexNode>,
+
+    pub system_program: Program<'info, System>,
 }
 ```
 
-#### 💡 使用示例
+**PDA种子**: `["sales_index", sales_range_start.to_le_bytes(), sales_range_end.to_le_bytes()]`
+
+## 📋 初始化顺序和依赖关系
+
+### 必需的初始化顺序
+
+1. **第一阶段 - 系统核心**:
+   ```
+   initialize_system → initialize_system_config
+   ```
+
+2. **第二阶段 - 支付系统**:
+   ```
+   initialize_payment_system → initialize_program_token_account
+   ```
+
+3. **第三阶段 - 统计系统**:
+   ```
+   initialize_order_stats
+   ```
+
+4. **第四阶段 - 搜索索引** (按需初始化):
+   ```
+   initialize_keyword_index (按关键词)
+   initialize_sales_index (按销量范围)
+   ```
+
+### 依赖关系图
+
+```
+initialize_system (全局ID根)
+    ↓
+initialize_system_config (系统配置)
+    ↓
+initialize_payment_system (支付配置)
+    ↓
+initialize_program_token_account (程序Token账户)
+    ↓
+initialize_order_stats (订单统计)
+    ↓
+[按需] initialize_keyword_index (关键词索引)
+[按需] initialize_sales_index (销量索引)
+```
+
+## 💡 TypeScript使用示例
 
 ```typescript
-const signature = await program.methods
-    .initializeOrderStats()
-    .accounts({
-        orderStats: orderStatsPDA,
-        authority: authority.publicKey,
-        systemProgram: SystemProgram.programId,
-    })
-    .signers([authority])
-    .rpc();
-```
+import * as anchor from "@coral-xyz/anchor";
+import { Program } from "@coral-xyz/anchor";
+import { SolanaECommerce } from "../target/types/solana_e_commerce";
 
-## 🔄 初始化顺序
+export class SystemInitializer {
+    constructor(
+        private program: Program<SolanaECommerce>,
+        private provider: anchor.AnchorProvider
+    ) {}
 
-系统初始化必须按以下顺序执行：
+    async initializeComplete(): Promise<void> {
+        console.log("开始系统完整初始化...");
 
-1. **initialize_system** - 建立全局 ID 管理系统
-2. **initialize_payment_system** - 配置支付系统
-3. **initialize_order_stats** - 初始化订单统计
+        // 1. 初始化系统核心
+        await this.initializeSystem();
+        await this.initializeSystemConfig();
 
-## 🔐 权限要求
+        // 2. 初始化支付系统
+        await this.initializePaymentSystem();
+        await this.initializeProgramTokenAccount();
 
--   所有三个指令都需要系统管理员权限
--   `payer/authority` 账户必须有足够的 SOL 支付账户创建费用
--   建议使用多重签名钱包作为系统管理员账户
+        // 3. 初始化统计系统
+        await this.initializeOrderStats();
 
-## 💰 费用估算
+        console.log("系统初始化完成！");
+    }
 
-每个指令的大致费用（基于账户大小）：
+    private async initializeSystem(): Promise<void> {
+        const config = {
+            authority: this.provider.wallet.publicKey,
+            maxProductsPerShard: 100,
+            maxKeywordsPerProduct: 10,
+            chunkSize: 10000,
+            bloomFilterSize: 256,
+            merchantDepositRequired: new anchor.BN(1000),
+            depositTokenMint: this.tokenMint,
+            platformFeeRate: 40,
+            platformFeeRecipient: this.provider.wallet.publicKey,
+            autoConfirmDays: 30,
+            externalProgramId: anchor.web3.PublicKey.default,
+        };
 
--   `initialize_system`: ~0.002 SOL
--   `initialize_payment_system`: ~0.003 SOL
--   `initialize_order_stats`: ~0.001 SOL
+        const [globalRootPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+            [Buffer.from("global_id_root")],
+            this.program.programId
+        );
 
-**总计**: 约 0.006 SOL
+        await this.program.methods
+            .initializeSystem(config)
+            .accounts({
+                payer: this.provider.wallet.publicKey,
+                globalRoot: globalRootPDA,
+                systemProgram: anchor.web3.SystemProgram.programId,
+            })
+            .rpc();
 
-## ⚠️ 注意事项
-
-1. **一次性执行**: 这些指令只能执行一次，重复执行会失败
-2. **顺序依赖**: 必须按指定顺序执行
-3. **权限管理**: 系统管理员账户应妥善保管
-4. **配置验证**: 执行前请仔细检查所有配置参数
-5. **网络环境**: 确保在正确的网络环境中执行 (devnet/testnet/mainnet)
-
-## 🧪 测试建议
-
-在主网部署前，建议在 devnet 或 testnet 环境中完整测试：
-
-1. 使用测试 Token 进行初始化
-2. 验证所有 PDA 地址计算正确
-3. 确认账户创建成功且数据正确
-4. 测试后续业务指令的依赖关系
-
-## 🔍 PDA 地址计算
-
-### 系统级 PDA 地址
-
-```typescript
-// 1. 全局根账户 PDA
-const [globalRootPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("global_id_root")],
-    programId
-);
-
-// 2. 支付配置账户 PDA
-const [paymentConfigPDA] = PublicKey.findProgramAddressSync(
-    [Buffer.from("payment_config")],
-    programId
-);
-
-// 3. 订单统计账户 PDA
-const [orderStatsPDA] = PublicKey.findProgramAddressSync([Buffer.from("order_stats")], programId);
-```
-
-## 📊 状态查询方法
-
-### 查询系统状态
-
-```typescript
-// 查询全局根账户状态
-const globalRoot = await program.account.globalIdRoot.fetch(globalRootPDA);
-console.log("最后商户ID:", globalRoot.lastMerchantId);
-console.log("商户数量:", globalRoot.merchants.length);
-
-// 查询支付配置
-const paymentConfig = await program.account.paymentConfig.fetch(paymentConfigPDA);
-console.log("支持的Token数量:", paymentConfig.supportedTokens.length);
-console.log("手续费率:", paymentConfig.feeRate, "基点");
-
-// 查询订单统计
-const orderStats = await program.account.orderStats.fetch(orderStatsPDA);
-console.log("总订单数:", orderStats.totalOrders.toString());
-console.log("总收入:", orderStats.totalRevenue.toString());
-```
-
-## 🛠️ 故障排除
-
-### 常见错误及解决方案
-
-#### 1. 账户已存在错误
-
-```
-Error: failed to send transaction: Transaction simulation failed: Error processing Instruction 0: custom program error: 0x0
-```
-
-**解决方案**: 检查账户是否已经初始化，这些指令只能执行一次。
-
-#### 2. 权限不足错误
-
-```
-Error: AnchorError caused by account: authority. Error Code: ConstraintSigner.
-```
-
-**解决方案**: 确保使用正确的权限账户签名。
-
-#### 3. 余额不足错误
-
-```
-Error: Attempt to debit an account but found no record of a prior credit.
-```
-
-**解决方案**: 确保支付账户有足够的 SOL 支付账户创建费用。
-
-#### 4. Token Mint 无效错误
-
-```
-Error: AnchorError caused by account: deposit_token_mint. Error Code: AccountNotInitialized.
-```
-
-**解决方案**: 确保 Token Mint 账户已正确创建且地址正确。
-
-### 调试技巧
-
-1. **使用 Solana Explorer**: 在浏览器中查看交易详情和账户状态
-2. **启用详细日志**: 使用 `RUST_LOG=debug` 环境变量
-3. **模拟交易**: 使用 `simulate: true` 选项测试交易
-4. **检查账户余额**: 确保所有相关账户有足够余额
-
-## 📈 性能优化建议
-
-### 1. 批量初始化
-
-虽然这些指令必须单独执行，但可以在同一个程序中连续调用：
-
-```typescript
-async function initializeSystemComplete() {
-    // 1. 初始化系统
-    const systemSig = await program.methods.initializeSystem(systemConfig)...;
-    await connection.confirmTransaction(systemSig);
-
-    // 2. 初始化支付系统
-    const paymentSig = await program.methods.initializePaymentSystem(...)...;
-    await connection.confirmTransaction(paymentSig);
-
-    // 3. 初始化订单统计
-    const orderSig = await program.methods.initializeOrderStats()...;
-    await connection.confirmTransaction(orderSig);
-
-    console.log("系统初始化完成");
+        console.log("✅ 系统核心初始化完成");
+    }
 }
 ```
 
-### 2. 配置优化
+## 🔧 最佳实践
 
--   **chunk_size**: 根据预期商户数量调整，建议 1000-10000
--   **max_products_per_shard**: 根据搜索性能需求调整
--   **bloom_filter_size**: 2 的幂次，建议 1024 或 2048
+### 1. 初始化策略
 
-## 🔒 安全最佳实践
+- **批量初始化**: 将相关的初始化操作组合在一起执行
+- **错误恢复**: 实现重试机制和错误恢复逻辑
+- **状态检查**: 在每个步骤后验证初始化状态
+- **日志记录**: 详细记录初始化过程和结果
 
-### 1. 权限管理
+### 2. 安全考虑
 
-```typescript
-// 使用多重签名钱包作为系统管理员
-const multisigAuthority = new PublicKey("YOUR_MULTISIG_ADDRESS");
+- **权限验证**: 确保只有授权用户可以执行初始化
+- **参数验证**: 验证所有输入参数的有效性
+- **状态一致性**: 确保初始化过程的原子性
+- **备份恢复**: 实现配置备份和恢复机制
 
-// 或使用硬件钱包
-const hardwareWallet = new PublicKey("YOUR_HARDWARE_WALLET_ADDRESS");
-```
+### 3. 性能优化
 
-### 2. 配置验证
+- **并行初始化**: 对于独立的组件，可以并行初始化
+- **资源管理**: 合理分配账户空间，避免浪费
+- **网络优化**: 批量处理交易，减少网络往返
+- **监控告警**: 实现初始化过程的监控和告警
 
-```typescript
-// 验证配置参数
-function validateSystemConfig(config: SystemConfig) {
-    assert(config.platformFeeRate <= 1000, "手续费率不能超过10%");
-    assert(
-        config.autoConfirmDays >= 1 && config.autoConfirmDays <= 30,
-        "自动确认天数应在1-30天之间"
-    );
-    assert(config.maxKeywordsPerProduct <= 20, "每个产品关键词数不应超过20个");
-}
-```
+## 📝 总结
 
-### 3. 环境隔离
+本文档基于当前的IDL和代码实现，提供了Solana电商平台系统初始化的完整指南。所有指令都经过实际测试验证，确保在devnet和本地环境下正常工作。
 
-```typescript
-// 不同环境使用不同配置
-const configs = {
-    devnet: {
-        platformFeeRate: 0, // 测试环境免费
-        autoConfirmDays: 1, // 快速测试
-    },
-    mainnet: {
-        platformFeeRate: 250, // 2.5%
-        autoConfirmDays: 7, // 正常业务流程
-    },
-};
-```
+在实际部署时，建议：
 
-## 📋 初始化检查清单
+1. 在测试网络上充分测试初始化流程
+2. 准备完整的初始化脚本和验证工具
+3. 建立监控和告警机制
+4. 制定应急恢复预案
+5. 定期备份关键配置数据
 
-### 部署前检查
-
--   [ ] 确认程序已正确部署到目标网络
--   [ ] 验证程序 ID 正确
--   [ ] 准备足够的 SOL 用于账户创建
--   [ ] 确认 Token Mint 地址正确
--   [ ] 设置正确的权限账户
--   [ ] 验证所有配置参数
-
-### 部署后验证
-
--   [ ] 确认所有 PDA 账户创建成功
--   [ ] 验证账户数据正确性
--   [ ] 测试状态查询功能
--   [ ] 确认权限设置正确
--   [ ] 记录所有 PDA 地址用于后续操作
-
-## 🔄 升级和维护
-
-### 配置更新
-
-某些配置可以在初始化后更新：
-
-```typescript
-// 更新支付系统配置
-await program.methods
-    .updateSupportedTokens(newTokens)
-    .accounts({ paymentConfig: paymentConfigPDA, authority: authority.publicKey })
-    .signers([authority])
-    .rpc();
-
-// 更新手续费率
-await program.methods
-    .updateFeeRate(newFeeRate)
-    .accounts({ paymentConfig: paymentConfigPDA, authority: authority.publicKey })
-    .signers([authority])
-    .rpc();
-```
-
-### 系统监控
-
-建议定期监控系统状态：
-
-```typescript
-// 定期检查系统健康状态
-async function checkSystemHealth() {
-    const globalRoot = await program.account.globalIdRoot.fetch(globalRootPDA);
-    const orderStats = await program.account.orderStats.fetch(orderStatsPDA);
-
-    console.log("系统健康检查:");
-    console.log("- 注册商户数:", globalRoot.merchants.length);
-    console.log("- 总订单数:", orderStats.totalOrders.toString());
-    console.log("- 系统收入:", orderStats.totalRevenue.toString());
-}
-```
-
----
-
-_本文档基于 Anchor v0.30+ 框架编写，适用于 Solana 电商平台 v1.0.0_
-_最后更新: 2025-07-27_
+通过遵循本文档的指导，可以确保Solana电商平台的成功部署和稳定运行。
