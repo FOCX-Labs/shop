@@ -21,7 +21,7 @@ pub struct ManageDeposit<'info> {
 
     // 系统配置账户
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
@@ -149,7 +149,7 @@ pub struct WithdrawMerchantDeposit<'info> {
 
     // 系统配置账户
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
@@ -270,7 +270,7 @@ pub struct GetMerchantDepositInfo<'info> {
 
     // 系统配置账户
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
@@ -315,7 +315,7 @@ pub struct UpdateDepositRequirement<'info> {
     // 系统配置账户
     #[account(
         mut,
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
@@ -362,7 +362,7 @@ pub struct DeductMerchantDeposit<'info> {
 
     // 系统配置账户
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump,
         constraint = system_config.authority == authority.key() @ ErrorCode::Unauthorized
     )]

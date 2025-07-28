@@ -205,3 +205,43 @@ pub fn purchase_product_escrow(
 
     Ok(())
 }
+
+/// 初始化程序Token账户
+#[derive(Accounts)]
+pub struct InitializeProgramTokenAccount<'info> {
+    #[account(
+        init,
+        payer = authority,
+        token::mint = payment_token_mint,
+        token::authority = program_authority,
+        seeds = [b"program_token_account"],
+        bump
+    )]
+    pub program_token_account: Account<'info, TokenAccount>,
+
+    /// CHECK: 程序权限账户，用于控制Token转账
+    #[account(
+        seeds = [b"program_authority"],
+        bump
+    )]
+    pub program_authority: UncheckedAccount<'info>,
+
+    pub payment_token_mint: Account<'info, Mint>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
+}
+
+pub fn initialize_program_token_account(ctx: Context<InitializeProgramTokenAccount>) -> Result<()> {
+    msg!(
+        "程序Token账户初始化成功: {}, Token Mint: {}, 权限账户: {}",
+        ctx.accounts.program_token_account.key(),
+        ctx.accounts.payment_token_mint.key(),
+        ctx.accounts.program_authority.key()
+    );
+
+    Ok(())
+}

@@ -17,7 +17,7 @@ pub struct InitializeMerchant<'info> {
 
     // 系统配置账户，用于获取保证金代币mint
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, crate::SystemConfig>,
@@ -174,7 +174,7 @@ pub struct RegisterMerchantAtomic<'info> {
     pub merchant_info: Account<'info, Merchant>,
 
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, crate::SystemConfig>,

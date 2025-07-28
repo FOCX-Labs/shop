@@ -3,6 +3,7 @@ pub mod id_generator;
 pub mod initialize;
 pub mod keyword_index;
 pub mod merchant;
+
 pub mod order;
 pub mod payment;
 pub mod price_index;
@@ -14,6 +15,7 @@ pub use id_generator::*;
 pub use initialize::*;
 pub use keyword_index::*;
 pub use merchant::*;
+
 pub use order::*;
 pub use payment::*;
 pub use price_index::*;

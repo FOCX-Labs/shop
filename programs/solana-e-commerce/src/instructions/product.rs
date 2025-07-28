@@ -245,6 +245,38 @@ pub fn create_product_extended(
 
 // ==================== 辅助函数 ====================
 
+/// 更新ProductExtended账户的扩展字段
+fn update_product_extended_fields(
+    product_extended: &mut ProductExtended,
+    image_video_urls: Option<Vec<String>>,
+    sales_regions: Option<Vec<String>>,
+    logistics_methods: Option<Vec<String>>,
+) -> Result<()> {
+    // 更新图片视频URL
+    if let Some(new_image_video_urls) = image_video_urls {
+        let urls_string = ProductExtended::vec_to_image_urls_string(new_image_video_urls);
+        product_extended.image_video_urls = urls_string;
+        msg!("图片视频URL已更新");
+    }
+
+    // 更新销售区域
+    if let Some(new_sales_regions) = sales_regions {
+        let regions_string = ProductExtended::vec_to_sales_regions_string(new_sales_regions);
+        product_extended.sales_regions = regions_string;
+        msg!("销售区域已更新");
+    }
+
+    // 更新物流方式
+    if let Some(new_logistics_methods) = logistics_methods {
+        let methods_string =
+            ProductExtended::vec_to_logistics_methods_string(new_logistics_methods);
+        product_extended.logistics_methods = methods_string;
+        msg!("物流方式已更新");
+    }
+
+    Ok(())
+}
+
 /// 创建产品账户的辅助函数
 fn create_product_account<'info>(
     payer: &Signer<'info>,
@@ -304,7 +336,7 @@ fn generate_next_product_id(
             merchant_account.last_local_id = local_id;
 
             // 使用 activeChunk.startId + localId 计算产品ID
-            let product_id = active_chunk.start_id + (local_id as u64);
+            let product_id = active_chunk.start_id + local_id;
 
             msg!(
                 "生成产品ID: startId {} + 本地ID {} = {}",
@@ -450,10 +482,19 @@ pub struct UpdateProduct<'info> {
     pub product: Account<'info, ProductBase>,
 
     #[account(
+        mut,
+        seeds = [b"product_extended", product_id.to_le_bytes().as_ref()],
+        bump
+    )]
+    pub product_extended: Option<Account<'info, ProductExtended>>,
+
+    #[account(
         seeds = [b"payment_config"],
         bump
     )]
     pub payment_config: Account<'info, PaymentConfig>,
+
+    pub system_program: Program<'info, System>,
 }
 
 pub fn update_product(
@@ -514,23 +555,41 @@ pub fn update_product(
 
     // 注意：token_decimals 和 token_price 字段已移除，价格统一使用 price 字段
 
-    // TODO: 扩展字段更新需要通过ProductExtended账户处理
-    if let Some(_new_image_video_urls) = image_video_urls {
-        msg!("图片视频URL更新功能暂时禁用，需要通过ProductExtended账户处理");
-    }
-
     // 更新发货地点（这个字段在ProductBase中）
     if let Some(new_shipping_location) = shipping_location {
         product.shipping_location = new_shipping_location;
     }
 
-    // TODO: 扩展字段更新需要通过ProductExtended账户处理
-    if let Some(_new_sales_regions) = sales_regions {
-        msg!("销售区域更新功能暂时禁用，需要通过ProductExtended账户处理");
-    }
+    // 处理ProductExtended扩展字段更新
+    let has_extended_updates =
+        image_video_urls.is_some() || sales_regions.is_some() || logistics_methods.is_some();
 
-    if let Some(_new_logistics_methods) = logistics_methods {
-        msg!("物流方式更新功能暂时禁用，需要通过ProductExtended账户处理");
+    if has_extended_updates {
+        if let Some(product_extended) = &mut ctx.accounts.product_extended {
+            // ProductExtended账户存在，直接更新
+            update_product_extended_fields(
+                product_extended,
+                image_video_urls,
+                sales_regions,
+                logistics_methods,
+            )?;
+
+            msg!("ProductExtended字段更新成功");
+        } else {
+            // ProductExtended账户不存在，需要先创建
+            msg!("警告: ProductExtended账户不存在，无法更新扩展字段。请先调用create_product_extended指令创建扩展账户。");
+
+            // 记录尝试更新的字段
+            if image_video_urls.is_some() {
+                msg!("尝试更新图片视频URL，但ProductExtended账户不存在");
+            }
+            if sales_regions.is_some() {
+                msg!("尝试更新销售区域，但ProductExtended账户不存在");
+            }
+            if logistics_methods.is_some() {
+                msg!("尝试更新物流方式，但ProductExtended账户不存在");
+            }
+        }
     }
 
     // 更新时间戳

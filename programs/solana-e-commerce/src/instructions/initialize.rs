@@ -46,7 +46,7 @@ pub struct InitializeSystemConfig<'info> {
         init,
         payer = payer,
         space = 8 + std::mem::size_of::<SystemConfig>(),
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
@@ -71,6 +71,7 @@ pub fn initialize_system_config(
     system_config.platform_fee_rate = config.platform_fee_rate;
     system_config.platform_fee_recipient = config.platform_fee_recipient;
     system_config.auto_confirm_days = config.auto_confirm_days;
+    system_config.external_program_id = config.external_program_id;
 
     msg!(
         "系统配置初始化成功，管理员: {}, 保证金要求: {} tokens",
@@ -86,7 +87,7 @@ pub fn initialize_system_config(
 pub struct CloseSystemConfig<'info> {
     #[account(
         mut,
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump,
         close = beneficiary
     )]

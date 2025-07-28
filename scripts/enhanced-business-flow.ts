@@ -31,6 +31,7 @@ export class EnhancedBusinessFlowExecutor {
   private program: Program<SolanaECommerce>;
   private authority: Keypair;
   private tokenMint?: PublicKey;
+  private tokenSymbol: string = "TOKEN"; // 动态获取的Token符号
   private merchantKeypair?: Keypair;
   private merchantTokenAccount?: PublicKey;
   private buyerKeypair?: Keypair;
@@ -47,13 +48,13 @@ export class EnhancedBusinessFlowExecutor {
       {
         name: "iPhone 15 Pro",
         description: "最新款苹果手机，配备A17 Pro芯片",
-        price: 50, // Token价格 (50 DXDV)
+        price: 50, // Token价格 (50 Token)
         keywords: ["手机", "苹果", "iPhone"],
       },
       {
         name: "MacBook Pro",
         description: "专业级笔记本电脑，适合开发者使用",
-        price: 100, // Token价格 (100 DXDV)
+        price: 100, // Token价格 (100 Token)
         keywords: ["电脑", "苹果", "MacBook"],
       },
     ],
@@ -98,6 +99,141 @@ export class EnhancedBusinessFlowExecutor {
   private calculatePDA(seeds: (string | Buffer)[]): [PublicKey, number] {
     const seedBuffers = seeds.map((seed) => (typeof seed === "string" ? Buffer.from(seed) : seed));
     return PublicKey.findProgramAddressSync(seedBuffers, this.program.programId);
+  }
+
+  /**
+   * 格式化Token金额显示
+   */
+  private formatTokenAmount(amount: number): string {
+    return `${amount} ${this.tokenSymbol}`;
+  }
+
+  /**
+   * 兼容性读取MerchantIdAccount账户数据
+   * 支持从u32格式迁移到u64格式
+   */
+  private async readMerchantIdAccountCompatible(
+    merchantIdAccountPDA: PublicKey
+  ): Promise<{ merchantId: number; activeChunk: PublicKey }> {
+    try {
+      // 尝试新格式读取
+      const merchantIdAccount = await this.program.account.merchantIdAccount.fetch(
+        merchantIdAccountPDA
+      );
+      return {
+        merchantId: merchantIdAccount.merchantId,
+        activeChunk: merchantIdAccount.activeChunk,
+      };
+    } catch (error) {
+      console.log(`   ⚠️ 商户ID账户新格式读取失败，尝试兼容性读取`);
+
+      // 手动读取账户数据
+      const accountInfo = await this.connection.getAccountInfo(merchantIdAccountPDA);
+      if (!accountInfo) {
+        throw new Error("商户ID账户不存在");
+      }
+
+      const data = accountInfo.data;
+      console.log(`   📊 商户ID账户数据大小: ${data.length} 字节`);
+
+      try {
+        // 手动解析旧格式数据
+        // 跳过discriminator (8字节)
+        const merchantId = data.readUInt32LE(8); // u32
+        const lastChunkIndex = data.readUInt32LE(12); // u32
+        const lastLocalId = data.readBigUInt64LE(16); // u64 (这个字段可能已经是u64)
+
+        // activeChunk是Pubkey，32字节，从偏移量24开始
+        const activeChunkBytes = data.slice(24, 56);
+        const activeChunk = new PublicKey(activeChunkBytes);
+
+        console.log(
+          `   🔧 商户ID兼容性解析: merchantId=${merchantId}, lastChunkIndex=${lastChunkIndex}`
+        );
+        console.log(
+          `   🔧 商户ID兼容性解析: lastLocalId=${lastLocalId}, activeChunk=${activeChunk.toString()}`
+        );
+
+        return {
+          merchantId: merchantId,
+          activeChunk: activeChunk,
+        };
+      } catch (parseError) {
+        console.log(`   ❌ 商户ID兼容性解析失败: ${(parseError as Error).message}`);
+        throw new Error(`无法解析商户ID账户数据: ${(parseError as Error).message}`);
+      }
+    }
+  }
+
+  /**
+   * 读取IdChunk账户数据
+   */
+  private async readIdChunkData(
+    activeChunkPDA: PublicKey
+  ): Promise<{ startId: number; nextAvailable: number }> {
+    const activeChunk = await this.program.account.idChunk.fetch(activeChunkPDA);
+    return {
+      startId: activeChunk.startId.toNumber(),
+      nextAvailable: activeChunk.nextAvailable.toNumber(),
+    };
+  }
+
+  /**
+   * 计算价格范围的起始值
+   * 使用对数算法：给定价格P，找到满足 2^n ≤ P < 2^(n+1) 的n值
+   * 设置 price_range_start = 2^n
+   */
+  private calculatePriceRangeStart(price: number): number {
+    if (price === 0) return 0;
+    if (price === 1) return 1;
+
+    // 找到最大的n，使得2^n <= price
+    // 例如：price=15时，floor(log2(15))=3，2^3=8 <= 15 < 2^4=16
+    const n = Math.floor(Math.log2(price));
+    return Math.pow(2, n);
+  }
+
+  /**
+   * 计算价格范围的结束值
+   * 设置 price_range_end = 2^(n+1)
+   */
+  private calculatePriceRangeEnd(price: number): number {
+    if (price === 0) return 0;
+    if (price === 1) return 1;
+
+    // 找到最大的n，使得2^n <= price
+    // 例如：price=15时，floor(log2(15))=3，price_range_end=2^(3+1)=16
+    const n = Math.floor(Math.log2(price));
+    return Math.pow(2, n + 1);
+  }
+
+  /**
+   * 动态获取Token符号
+   */
+  private async getTokenSymbol(): Promise<string> {
+    if (!this.tokenMint) {
+      return "TOKEN";
+    }
+
+    try {
+      // 尝试从支付配置中获取Token符号
+      const [paymentConfigPDA] = this.calculatePDA(["payment_config"]);
+      const paymentConfig = await this.program.account.paymentConfig.fetch(paymentConfigPDA);
+      const supportedTokens = paymentConfig.supportedTokens as any[];
+
+      if (supportedTokens && supportedTokens.length > 0) {
+        const tokenInfo = supportedTokens.find((token) => token.mint.equals(this.tokenMint));
+        if (tokenInfo && tokenInfo.symbol) {
+          return tokenInfo.symbol;
+        }
+      }
+    } catch (error) {
+      // 如果无法从支付配置获取，使用默认逻辑
+    }
+
+    // 根据环境返回默认符号
+    const isLocal = process.argv.includes("--local");
+    return isLocal ? "LOCAL" : "DXDV";
   }
 
   /**
@@ -178,13 +314,16 @@ export class EnhancedBusinessFlowExecutor {
         initialSupply
       );
 
-      console.log(`   ✅ 初始Token供应量铸造完成: 1,000,000 DXDV`);
+      console.log(`   ✅ 初始Token供应量铸造完成: 1,000,000 ${await this.getTokenSymbol()}`);
       console.log(`   📍 权限账户Token账户: ${authorityTokenAccount.toString()}`);
     } else {
       // Devnet环境使用现有的Token Mint
       this.tokenMint = new PublicKey("DXDVt289yXEcqXDd9Ub3HqSBTWwrmNB8DzQEagv9Svtu");
       console.log(`   🪙 Devnet环境：使用现有Token Mint: ${this.tokenMint!.toString()}`);
     }
+
+    // 更新Token符号
+    this.tokenSymbol = await this.getTokenSymbol();
   }
 
   /**
@@ -233,29 +372,56 @@ export class EnhancedBusinessFlowExecutor {
       return;
     }
 
-    // 创建系统配置对象
+    // 创建系统配置对象 - initialize_system 指令参数
     const systemConfig = {
+      // 系统管理员地址 - 拥有系统配置修改权限
       authority: this.authority.publicKey,
+
+      // 每个分片最大产品数 - 控制索引分片大小，影响搜索性能
       maxProductsPerShard: 1000,
+
+      // 每个产品最大关键词数 - 限制产品关键词数量，防止滥用
       maxKeywordsPerProduct: 10,
+
+      // 块大小 - 用于批量处理操作的块大小
       chunkSize: 1000,
+
+      // 布隆过滤器大小 - 用于快速过滤不存在的关键词，提高搜索效率
       bloomFilterSize: 1024,
-      merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, 9)), // 1000 tokens
+
+      // 商户保证金要求 - 商户注册时需要缴纳的保证金数量（基础单位，会根据Token精度动态计算）
+      merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, 9)), // 1000 tokens (9位精度)
+
+      // 保证金Token mint地址 - 指定用于缴纳保证金的Token类型
       depositTokenMint: this.tokenMint!,
-      platformFeeRate: 250, // 2.5%
+
+      // 平台手续费率 - 以基点为单位，250 = 2.5%
+      platformFeeRate: 250,
+
+      // 平台手续费接收账户 - 手续费收入的接收地址
       platformFeeRecipient: this.authority.publicKey,
+
+      // 自动确认收货天数 - 订单发货后多少天自动确认收货
       autoConfirmDays: 7,
+
+      // 外部程序ID - 用于CPI调用add_rewards指令的外部程序地址
+      externalProgramId: new PublicKey("11111111111111111111111111111112"), // 示例外部程序ID
     };
 
-    // 创建全局ID根账户
+    // 调用 initialize_system 指令
     const signature = await this.program.methods
-      .initializeSystem(systemConfig)
+      .initializeSystem(systemConfig) // 传入SystemConfig参数
       .accounts({
+        // payer (mut, signer) - 支付账户，用于支付账户创建费用
         payer: this.authority.publicKey,
+
+        // global_root (mut, PDA) - 全局根账户，PDA种子: ["global_id_root"]
         globalRoot: globalRootPDA,
+
+        // system_program - Solana系统程序，用于创建账户
         systemProgram: SystemProgram.programId,
       } as any)
-      .signers([this.authority])
+      .signers([this.authority]) // 权限账户签名
       .rpc();
 
     await this.connection.confirmTransaction(signature);
@@ -268,7 +434,7 @@ export class EnhancedBusinessFlowExecutor {
    * 初始化系统配置账户
    */
   private async initializeSystemConfig(): Promise<void> {
-    const [systemConfigPDA] = this.calculatePDA(["system_config"]);
+    const [systemConfigPDA] = this.calculatePDA(["system_config_v2"]);
 
     // 检查账户是否已存在
     const existingAccount = await this.connection.getAccountInfo(systemConfigPDA);
@@ -283,29 +449,56 @@ export class EnhancedBusinessFlowExecutor {
       return;
     }
 
-    // 创建系统配置对象
+    // 创建系统配置对象 - initialize_system_config 指令参数
     const systemConfig = {
+      // 系统管理员地址 - 拥有系统配置修改权限
       authority: this.authority.publicKey,
+
+      // 每个分片最大产品数 - 控制索引分片大小，影响搜索性能
       maxProductsPerShard: 1000,
+
+      // 每个产品最大关键词数 - 限制产品关键词数量，防止滥用
       maxKeywordsPerProduct: 10,
+
+      // 块大小 - 用于批量处理操作的块大小
       chunkSize: 1000,
+
+      // 布隆过滤器大小 - 用于快速过滤不存在的关键词，提高搜索效率
       bloomFilterSize: 1024,
-      merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, 9)), // 1000 tokens
+
+      // 商户保证金要求 - 商户注册时需要缴纳的保证金数量（基础单位，会根据Token精度动态计算）
+      merchantDepositRequired: new anchor.BN(1000 * Math.pow(10, 9)), // 1000 tokens (9位精度)
+
+      // 保证金Token mint地址 - 指定用于缴纳保证金的Token类型
       depositTokenMint: this.tokenMint!,
-      platformFeeRate: 250, // 2.5%
+
+      // 平台手续费率 - 以基点为单位，250 = 2.5%
+      platformFeeRate: 250,
+
+      // 平台手续费接收账户 - 手续费收入的接收地址
       platformFeeRecipient: this.authority.publicKey,
+
+      // 自动确认收货天数 - 订单发货后多少天自动确认收货
       autoConfirmDays: 7,
+
+      // 外部程序ID - 用于CPI调用add_rewards指令的外部程序地址
+      externalProgramId: new PublicKey("11111111111111111111111111111112"), // 示例外部程序ID
     };
 
-    // 创建系统配置账户
+    // 调用 initialize_system_config 指令
     const signature = await this.program.methods
-      .initializeSystemConfig(systemConfig)
+      .initializeSystemConfig(systemConfig) // 传入SystemConfig参数
       .accounts({
+        // payer (mut, signer) - 支付账户，用于支付账户创建费用
         payer: this.authority.publicKey,
+
+        // system_config (mut, PDA) - 系统配置账户，PDA种子: ["system_config"]
         systemConfig: systemConfigPDA,
+
+        // system_program - Solana系统程序，用于创建账户
         systemProgram: SystemProgram.programId,
       } as any)
-      .signers([this.authority])
+      .signers([this.authority]) // 权限账户签名
       .rpc();
 
     await this.connection.confirmTransaction(signature);
@@ -334,35 +527,48 @@ export class EnhancedBusinessFlowExecutor {
       return;
     }
 
-    // 创建支持的Token列表
+    // 创建支持的Token列表 - initialize_payment_system 指令参数
     const supportedTokens = [
       {
+        // Token mint地址 - SPL Token的mint账户地址
         mint: this.tokenMint!,
-        symbol: "DXDV",
+
+        // Token符号 - 用于显示的Token名称（最大10字符）
+        symbol: this.tokenSymbol,
+
+        // 是否启用 - 控制该Token是否可用于支付
         isActive: true,
       },
     ];
 
-    // 创建支付配置
+    // 调用 initialize_payment_system 指令
     const signature = await this.program.methods
       .initializePaymentSystem(
-        supportedTokens,
-        250, // 2.5% 手续费
-        this.authority.publicKey // 手续费接收者
+        supportedTokens, // Vec<SupportedToken> - 支持的Token列表（最多10个）
+        250, // u16 - 手续费率，以基点为单位（250 = 2.5%，最大10000 = 100%）
+        this.authority.publicKey // Pubkey - 手续费接收账户地址
       )
       .accounts({
+        // payment_config (mut, PDA) - 支付配置账户，PDA种子: ["payment_config"]
         paymentConfig: paymentConfigPDA,
+
+        // authority (mut, signer) - 权限账户，用于支付账户创建费用和设置权限
         authority: this.authority.publicKey,
+
+        // system_program - Solana系统程序，用于创建账户
         systemProgram: SystemProgram.programId,
       } as any)
-      .signers([this.authority])
+      .signers([this.authority]) // 权限账户签名
       .rpc();
 
     await this.connection.confirmTransaction(signature);
 
     console.log(`   ✅ 支付配置创建成功: ${paymentConfigPDA.toString()}`);
     console.log(`   📝 完整交易签名: ${signature}`);
-    console.log(`   🪙 支持的Token: DXDV (${this.tokenMint!.toString()})`);
+
+    // 立即创建程序Token账户
+    await this.initializeProgramTokenAccountInPaymentSystem();
+    console.log(`   🪙 支持的Token: ${this.tokenSymbol} (${this.tokenMint!.toString()})`);
     console.log(`   💰 平台手续费: 2.5%`);
   }
 
@@ -402,7 +608,47 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
-   * 初始化程序Token账户
+   * 在支付系统初始化时创建程序Token账户（正确的架构）
+   */
+  private async initializeProgramTokenAccountInPaymentSystem(): Promise<void> {
+    const [programTokenAccountPDA] = this.calculatePDA(["program_token_account"]);
+    const [programAuthorityPDA] = this.calculatePDA(["program_authority"]);
+
+    // 检查账户是否已存在
+    const existingAccount = await this.connection.getAccountInfo(programTokenAccountPDA);
+    if (existingAccount) {
+      console.log(`   ✅ 程序Token账户已存在: ${programTokenAccountPDA.toString()}`);
+      return;
+    }
+
+    try {
+      console.log(`   🔧 创建程序Token账户: ${programTokenAccountPDA.toString()}`);
+
+      // 使用专门的程序Token账户初始化指令
+      const signature = await this.program.methods
+        .initializeProgramTokenAccount()
+        .accounts({
+          programTokenAccount: programTokenAccountPDA,
+          programAuthority: programAuthorityPDA,
+          paymentTokenMint: this.tokenMint!,
+          authority: this.authority.publicKey,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: SystemProgram.programId,
+        } as any)
+        .signers([this.authority])
+        .rpc();
+
+      await this.connection.confirmTransaction(signature);
+      console.log(`   ✅ 程序Token账户创建成功: ${programTokenAccountPDA.toString()}`);
+      console.log(`   📝 创建交易签名: ${signature}`);
+    } catch (error) {
+      console.log(`   ❌ 程序Token账户创建失败: ${(error as Error).message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 初始化程序Token账户（旧方法，保留兼容性）
    */
   private async initializeProgramTokenAccount(): Promise<void> {
     const [programTokenAccountPDA] = this.calculatePDA(["program_token_account"]);
@@ -511,7 +757,7 @@ export class EnhancedBusinessFlowExecutor {
         this.authority.publicKey,
         transferTokenAmount
       );
-      console.log(`   💸 Token转移: 2000 DXDV`);
+      console.log(`   💸 Token转移: 2000 ${this.tokenSymbol}`);
       console.log(`   � 完整Token转移签名: ${tokenTransferSignature}`);
 
       // 计算PDA
@@ -520,7 +766,7 @@ export class EnhancedBusinessFlowExecutor {
         this.merchantKeypair.publicKey.toBuffer(),
       ]);
       const [globalRootPDA] = this.calculatePDA(["global_id_root"]);
-      const [systemConfigPDA] = this.calculatePDA(["system_config"]);
+      const [systemConfigPDA] = this.calculatePDA(["system_config_v2"]);
       const [merchantIdAccountPDA] = this.calculatePDA([
         "merchant_id",
         this.merchantKeypair.publicKey.toBuffer(),
@@ -582,7 +828,7 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   ✅ 原子交易成功完成！`);
       console.log(`   📝 完整原子交易签名: ${atomicSignature}`);
       console.log(`   🏪 商户账户: ${merchantInfoPDA.toString()}`);
-      console.log(`   💰 保证金: 2000 DXDV已存入托管账户`);
+      console.log(`   💰 保证金: 2000 ${this.tokenSymbol}已存入托管账户`);
       console.log(`   🔒 托管账户: ${depositEscrowPDA.toString()}`);
 
       // 验证商户余额
@@ -593,7 +839,9 @@ export class EnhancedBusinessFlowExecutor {
       const merchantTokenBalance = await this.connection.getTokenAccountBalance(
         this.merchantTokenAccount
       );
-      console.log(`   🪙 商户Token余额: ${merchantTokenBalance.value.uiAmount} DXDV`);
+      console.log(
+        `   🪙 商户Token余额: ${merchantTokenBalance.value.uiAmount} ${this.tokenSymbol}`
+      );
     } catch (error) {
       console.error(`   ❌ 商户注册和保证金缴纳失败: ${(error as Error).message}`);
       throw error;
@@ -617,13 +865,13 @@ export class EnhancedBusinessFlowExecutor {
         "merchant_info",
         this.merchantKeypair.publicKey.toBuffer(),
       ]);
-      const [systemConfigPDA] = this.calculatePDA(["system_config"]);
+      const [systemConfigPDA] = this.calculatePDA(["system_config_v2"]);
       const [depositEscrowPDA] = this.calculatePDA(["deposit_escrow"]);
 
       // 提取1000 Token作为演示
       const withdrawAmount = new anchor.BN(1000 * Math.pow(10, 9));
 
-      console.log(`   📊 提取保证金金额: 1000 DXDV`);
+      console.log(`   📊 提取保证金金额: ${this.formatTokenAmount(1000)}`);
       console.log(`   🏪 商户账户: ${this.merchantKeypair.publicKey.toString()}`);
       console.log(`   💳 接收Token账户: ${this.merchantTokenAccount.toString()}`);
 
@@ -652,8 +900,10 @@ export class EnhancedBusinessFlowExecutor {
       const merchantTokenBalance = await this.connection.getTokenAccountBalance(
         this.merchantTokenAccount
       );
-      console.log(`   🪙 商户Token余额: ${merchantTokenBalance.value.uiAmount} DXDV`);
-      console.log(`   💰 剩余保证金: 1000 DXDV（在托管账户中）`);
+      console.log(
+        `   🪙 商户Token余额: ${merchantTokenBalance.value.uiAmount} ${this.tokenSymbol}`
+      );
+      console.log(`   💰 剩余保证金: ${this.formatTokenAmount(1000)}（在托管账户中）`);
     } catch (error) {
       console.error(`   ❌ 保证金提取失败: ${(error as Error).message}`);
       console.log(`   ⚠️ 继续执行后续步骤`);
@@ -742,14 +992,17 @@ export class EnhancedBusinessFlowExecutor {
           merchantIdAccountPDA
         );
         activeChunkPDA = merchantIdAccount.activeChunk;
+        console.log(`   🔗 使用活跃块: ${activeChunkPDA.toString()}`);
       } catch (error) {
-        // 使用默认值
+        console.log(`   ⚠️ 无法获取活跃块信息，计算默认块PDA`);
+        // 计算默认的第一个ID块PDA
         const [defaultChunkPDA] = this.calculatePDA([
           "id_chunk",
           merchantKeypair.publicKey.toBuffer(),
-          Buffer.from([0]),
+          Buffer.from([0]), // chunk_index = 0
         ]);
         activeChunkPDA = defaultChunkPDA;
+        console.log(`   🔗 使用默认块: ${activeChunkPDA.toString()}`);
       }
 
       // 预先获取下一个产品ID
@@ -757,7 +1010,11 @@ export class EnhancedBusinessFlowExecutor {
       try {
         const activeChunk = await this.program.account.idChunk.fetch(activeChunkPDA);
         const nextLocalId = activeChunk.nextAvailable;
-        nextProductId = activeChunk.startId.toNumber() + nextLocalId;
+        nextProductId =
+          activeChunk.startId.toNumber() +
+          (typeof nextLocalId === "object" && nextLocalId && "toNumber" in nextLocalId
+            ? (nextLocalId as any).toNumber()
+            : nextLocalId);
         console.log(`   🆔 预计算产品ID: ${nextProductId}`);
       } catch (error) {
         // 如果无法获取，使用兼容性模式
@@ -774,7 +1031,7 @@ export class EnhancedBusinessFlowExecutor {
       const priceInTokens = Math.floor(product.price * Math.pow(10, 9)); // 转换为最小单位
 
       console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
-      console.log(`   💰 产品价格: ${product.price} DXDV`);
+      console.log(`   💰 产品价格: ${this.formatTokenAmount(product.price)}`);
 
       // 直接创建完整的单一原子交易包含所有操作（包括基础产品创建）
       console.log(`   🔗 开始创建产品完整原子交易（包含基础产品创建和所有关联操作）...`);
@@ -789,17 +1046,26 @@ export class EnhancedBusinessFlowExecutor {
       );
 
       if (completeAtomicResult.success) {
+        const actualProductId = completeAtomicResult.actualProductId!;
+
+        // 重新计算正确的产品账户PDA
+        const actualProductIdBytes = new anchor.BN(actualProductId).toArray("le", 8);
+        const [actualProductAccountPDA] = this.calculatePDA([
+          "product",
+          Buffer.from(actualProductIdBytes),
+        ]);
+
         console.log(`   🎉 产品"${product.name}"完整创建成功（单一原子交易）！`);
         console.log(`   📝 完整原子交易签名: ${completeAtomicResult.signature}`);
-        console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
-        console.log(`   🆔 产品ID: ${nextProductId}`);
+        console.log(`   📦 产品账户: ${actualProductAccountPDA.toString()}`);
+        console.log(`   🆔 实际产品ID: ${actualProductId}`);
         console.log(`   🔗 所有账户（包括基础产品）已在同一交易中创建`);
 
         return {
           success: true,
           signature: completeAtomicResult.signature!,
-          productAccount: productAccountPDA,
-          productId: nextProductId,
+          productAccount: actualProductAccountPDA,
+          productId: actualProductId,
         };
       } else {
         console.log(`   ❌ 产品完整创建失败: ${completeAtomicResult.error}`);
@@ -823,21 +1089,47 @@ export class EnhancedBusinessFlowExecutor {
    * 创建完整的单一原子交易（包含基础产品创建和所有相关操作）
    */
   private async createCompleteProductAtomic(
-    productId: number,
+    _unusedProductId: number, // 不再使用传入的产品ID
     productName: string,
     productDescription: string,
     keywords: string[],
     price: number,
     merchantKeypair: Keypair
-  ): Promise<{ success: boolean; signature?: string; error?: string }> {
+  ): Promise<{ success: boolean; signature?: string; error?: string; actualProductId?: number }> {
     try {
       // 验证关键词数量限制
       if (keywords.length > 3) {
         throw new Error(`关键词数量超限：${keywords.length}个，最多允许3个`);
       }
 
-      // 计算所有需要的PDA
-      const productIdBytes = new anchor.BN(productId).toArray("le", 8);
+      // 首先获取正确的产品ID
+      const [merchantIdAccountPDA] = this.calculatePDA([
+        "merchant_id",
+        merchantKeypair.publicKey.toBuffer(),
+      ]);
+
+      // 获取活跃块信息并计算正确的产品ID
+      let actualProductId: number;
+      let activeChunkPDA: PublicKey;
+
+      try {
+        const merchantData = await this.readMerchantIdAccountCompatible(merchantIdAccountPDA);
+        activeChunkPDA = merchantData.activeChunk;
+
+        // 读取活跃块数据
+        const chunkData = await this.readIdChunkData(activeChunkPDA);
+        actualProductId = chunkData.startId + chunkData.nextAvailable;
+
+        console.log(`   🔗 活跃块: ${activeChunkPDA.toString()}`);
+        console.log(
+          `   🆔 计算产品ID: ${chunkData.startId} + ${chunkData.nextAvailable} = ${actualProductId}`
+        );
+      } catch (error) {
+        throw new Error(`无法获取正确的产品ID: ${(error as Error).message}`);
+      }
+
+      // 使用正确的产品ID计算所有PDA
+      const productIdBytes = new anchor.BN(actualProductId).toArray("le", 8);
 
       // 产品扩展账户PDA
       const [productExtendedPDA] = this.calculatePDA([
@@ -848,9 +1140,9 @@ export class EnhancedBusinessFlowExecutor {
       // 产品基础账户PDA
       const [productBasePDA] = this.calculatePDA(["product", Buffer.from(productIdBytes)]);
 
-      // 价格索引PDA
-      const priceRangeStart = 0;
-      const priceRangeEnd = 100 * Math.pow(10, 9);
+      // 价格索引PDA - 使用动态价格范围计算
+      const priceRangeStart = this.calculatePriceRangeStart(price);
+      const priceRangeEnd = this.calculatePriceRangeEnd(price);
       const priceRangeStartBytes = new anchor.BN(priceRangeStart).toArray("le", 8);
       const priceRangeEndBytes = new anchor.BN(priceRangeEnd).toArray("le", 8);
       const [priceIndexPDA] = this.calculatePDA([
@@ -892,25 +1184,9 @@ export class EnhancedBusinessFlowExecutor {
       // 构建单一交易，包含所有指令
       const transaction = new anchor.web3.Transaction();
 
-      // 首先需要计算基础产品创建所需的PDA
+      // 计算基础产品创建所需的PDA
       const [globalRootPDA] = this.calculatePDA(["global_id_root"]);
-      const [merchantIdAccountPDA] = this.calculatePDA([
-        "merchant_id",
-        merchantKeypair.publicKey.toBuffer(),
-      ]);
       const [paymentConfigPDA] = this.calculatePDA(["payment_config"]);
-
-      // 获取活跃块信息
-      let activeChunkPDA: PublicKey;
-      try {
-        const merchantIdAccount = await this.program.account.merchantIdAccount.fetch(
-          merchantIdAccountPDA
-        );
-        activeChunkPDA = merchantIdAccount.activeChunk;
-      } catch (error) {
-        console.log(`   ⚠️ 无法获取活跃块信息，使用默认值`);
-        activeChunkPDA = merchantKeypair.publicKey; // 使用商户公钥作为备用
-      }
 
       // 1. 添加基础产品创建指令
       const createBaseIx = await this.program.methods
@@ -940,7 +1216,7 @@ export class EnhancedBusinessFlowExecutor {
       // 2. 添加产品扩展信息创建指令
       const createExtendedIx = await this.program.methods
         .createProductExtended(
-          new anchor.BN(productId),
+          new anchor.BN(actualProductId),
           ["https://example.com/image1.jpg", "https://example.com/image2.jpg"],
           ["中国大陆", "港澳台"],
           ["顺丰快递", "京东物流", "圆通速递"]
@@ -959,7 +1235,7 @@ export class EnhancedBusinessFlowExecutor {
       for (const { keyword, keywordRootPDA, targetShardPDA } of keywordPDAs) {
         try {
           const keywordIx = await this.program.methods
-            .addProductToKeywordIndex(keyword, new anchor.BN(productId))
+            .addProductToKeywordIndex(keyword, new anchor.BN(actualProductId))
             .accounts({
               keywordRoot: keywordRootPDA,
               targetShard: targetShardPDA,
@@ -975,13 +1251,13 @@ export class EnhancedBusinessFlowExecutor {
         }
       }
 
-      // 3. 添加价格索引创建指令
+      // 3. 添加价格索引创建指令（使用Anchor标准方法，客户端预计算范围）
       const priceIx = await this.program.methods
         .addProductToPriceIndex(
+          new anchor.BN(actualProductId),
+          new anchor.BN(price),
           new anchor.BN(priceRangeStart),
-          new anchor.BN(priceRangeEnd),
-          new anchor.BN(productId),
-          new anchor.BN(price)
+          new anchor.BN(priceRangeEnd)
         )
         .accounts({
           payer: merchantKeypair.publicKey,
@@ -995,7 +1271,7 @@ export class EnhancedBusinessFlowExecutor {
 
       // 4. 添加销量索引创建指令
       const salesIx = await this.program.methods
-        .addProductToSalesIndex(salesRangeStart, salesRangeEnd, new anchor.BN(productId), 0)
+        .addProductToSalesIndex(salesRangeStart, salesRangeEnd, new anchor.BN(actualProductId), 0)
         .accounts({
           payer: merchantKeypair.publicKey,
           salesIndex: salesIndexPDA,
@@ -1016,7 +1292,7 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   📝 交易签名: ${signature}`);
       console.log(`   📊 交易包含指令数: ${transaction.instructions.length}`);
 
-      return { success: true, signature };
+      return { success: true, signature, actualProductId };
     } catch (error) {
       const errorMsg = (error as Error).message;
       console.log(`   ❌ 完整原子交易创建失败: ${errorMsg}`);
@@ -1046,9 +1322,9 @@ export class EnhancedBusinessFlowExecutor {
       // 产品基础账户PDA
       const [productBasePDA] = this.calculatePDA(["product", Buffer.from(productIdBytes)]);
 
-      // 价格索引PDA
-      const priceRangeStart = 0;
-      const priceRangeEnd = 100 * Math.pow(10, 9);
+      // 价格索引PDA - 使用动态价格范围计算
+      const priceRangeStart = this.calculatePriceRangeStart(price);
+      const priceRangeEnd = this.calculatePriceRangeEnd(price);
       const priceRangeStartBytes = new anchor.BN(priceRangeStart).toArray("le", 8);
       const priceRangeEndBytes = new anchor.BN(priceRangeEnd).toArray("le", 8);
       const [priceIndexPDA] = this.calculatePDA([
@@ -1166,18 +1442,18 @@ export class EnhancedBusinessFlowExecutor {
     merchantKeypair: Keypair
   ): Promise<void> {
     try {
-      // 创建价格索引
-      const priceRangeStart = 0;
-      const priceRangeEnd = 100 * Math.pow(10, 9);
+      // 创建价格索引 - 使用动态价格范围计算
+      const priceRangeStart = this.calculatePriceRangeStart(price);
+      const priceRangeEnd = this.calculatePriceRangeEnd(price);
 
-      console.log(`   💰 添加产品到价格索引...`);
+      console.log(`   💰 添加产品到价格索引 (范围: ${priceRangeStart} - ${priceRangeEnd})...`);
 
       const priceSignature = await this.program.methods
         .addProductToPriceIndex(
-          new anchor.BN(priceRangeStart),
-          new anchor.BN(priceRangeEnd),
           new anchor.BN(productId),
-          new anchor.BN(price)
+          new anchor.BN(price),
+          new anchor.BN(priceRangeStart),
+          new anchor.BN(priceRangeEnd)
         )
         .accounts({
           payer: merchantKeypair.publicKey,
@@ -1327,9 +1603,9 @@ export class EnhancedBusinessFlowExecutor {
     merchantKeypair: Keypair
   ): Promise<{ success: boolean; signature?: string; error?: string }> {
     try {
-      // 定义价格范围（例如：0-100 DXDV）
-      const priceRangeStart = 0;
-      const priceRangeEnd = 100 * Math.pow(10, 9); // 100 DXDV in lamports
+      // 使用动态价格范围计算
+      const priceRangeStart = this.calculatePriceRangeStart(price);
+      const priceRangeEnd = this.calculatePriceRangeEnd(price);
 
       // 计算价格索引PDA
       const priceRangeStartBytes = new anchor.BN(priceRangeStart).toArray("le", 8);
@@ -1340,14 +1616,16 @@ export class EnhancedBusinessFlowExecutor {
         Buffer.from(priceRangeEndBytes),
       ]);
 
-      console.log(`   💰 添加产品到价格索引: ${priceIndexPDA.toString()}`);
+      console.log(
+        `   💰 添加产品到价格索引: ${priceIndexPDA.toString()} (范围: ${priceRangeStart} - ${priceRangeEnd})`
+      );
 
       const signature = await this.program.methods
         .addProductToPriceIndex(
-          new anchor.BN(priceRangeStart),
-          new anchor.BN(priceRangeEnd),
           new anchor.BN(productId),
-          new anchor.BN(price)
+          new anchor.BN(price),
+          new anchor.BN(priceRangeStart),
+          new anchor.BN(priceRangeEnd)
         )
         .accounts({
           payer: merchantKeypair.publicKey,
@@ -1516,7 +1794,7 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   ✅ 程序Token账户创建成功: ${programTokenAccountPDA.toString()}`);
       console.log(`   📝 创建交易签名: ${signature}`);
       console.log(`   🔑 账户权限: ${programAuthorityPDA.toString()}`);
-      console.log(`   🪙 Token类型: DXDV (${this.tokenMint!.toString()})`);
+      console.log(`   🪙 Token类型: ${this.tokenSymbol} (${this.tokenMint!.toString()})`);
     } catch (error) {
       console.log(`   ⚠️ 程序Token账户创建失败: ${(error as Error).message}`);
       console.log(`   💡 将在退款时尝试其他创建方式`);
@@ -1542,9 +1820,9 @@ export class EnhancedBusinessFlowExecutor {
 
       // 修改第一个产品的价格
       console.log("\n   📝 修改第一个产品价格...");
-      const firstProductResult = await this.updateProductPrice(0, 60); // 从50改为60 DXDV
+      const firstProductResult = await this.updateProductPrice(0, 60); // 从50改为60 Token
       if (firstProductResult.success) {
-        console.log(`   ✅ 第一个产品价格修改成功: 60 DXDV`);
+        console.log(`   ✅ 第一个产品价格修改成功: ${this.formatTokenAmount(60)}`);
         console.log(`   📝 价格修改交易签名: ${firstProductResult.signature}`);
       } else {
         console.log(`   ❌ 第一个产品价格修改失败: ${firstProductResult.error}`);
@@ -1588,7 +1866,7 @@ export class EnhancedBusinessFlowExecutor {
 
       const newPriceInTokens = Math.floor(newPrice * Math.pow(10, 9));
 
-      console.log(`   💰 更新产品价格: ${newPrice} DXDV`);
+      console.log(`   💰 更新产品价格: ${this.formatTokenAmount(newPrice)}`);
       console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
 
       const signature = await this.program.methods
@@ -1610,7 +1888,7 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
-   * 更新产品信息
+   * 更新产品信息（包含ProductExtended扩展字段更新）
    */
   private async updateProductInfo(
     productIndex: number
@@ -1627,38 +1905,65 @@ export class EnhancedBusinessFlowExecutor {
       const productId = this.createdProductIds[productIndex];
       const productIdBytes = new anchor.BN(productId).toArray("le", 8);
       const [productAccountPDA] = this.calculatePDA(["product", Buffer.from(productIdBytes)]);
+      const [productExtendedPDA] = this.calculatePDA([
+        "product_extended",
+        Buffer.from(productIdBytes),
+      ]);
       const [paymentConfigPDA] = this.calculatePDA(["payment_config"]);
 
-      console.log(`   📝 更新产品信息`);
+      console.log(`   📝 更新产品信息（包含扩展字段）`);
       console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
+      console.log(`   📋 产品扩展账户: ${productExtendedPDA.toString()}`);
 
       const signature = await this.program.methods
         .updateProduct(
           new anchor.BN(productId),
-          "MacBook Pro M3", // 新名称
-          "最新款MacBook Pro，搭载M3芯片，性能更强劲", // 新描述
+          "MacBook Pro M3 Max", // 新名称
+          "最新款MacBook Pro，搭载M3 Max芯片，性能更强劲，支持专业级创作", // 新描述
           null, // 价格不变
           ["电脑", "苹果", "MacBook"], // 新关键词（限制3个）
           null, // 库存不变
           null, // 支付Token不变
-          null, // 图片URL不变
-          "深圳市南山区", // 新发货地点
-          null, // 销售区域不变
-          null // 物流方式不变
+          // ⭐ 更新扩展字段：图片视频URL
+          [
+            "https://example.com/macbook-pro-m3-1.jpg",
+            "https://example.com/macbook-pro-m3-2.jpg",
+            "https://example.com/macbook-pro-m3-video.mp4",
+            "https://example.com/macbook-pro-m3-3.jpg",
+          ],
+          "深圳市南山区科技园", // 新发货地点
+          // ⭐ 更新扩展字段：销售区域
+          ["中国大陆", "港澳台", "新加坡", "马来西亚", "日本"],
+          // ⭐ 更新扩展字段：物流方式
+          ["顺丰快递", "京东物流", "DHL国际", "FedEx", "EMS"]
         )
         .accounts({
           merchant: this.merchantKeypair.publicKey,
           product: productAccountPDA,
+          productExtended: productExtendedPDA, // ⭐ 添加ProductExtended账户
           paymentConfig: paymentConfigPDA,
+          systemProgram: SystemProgram.programId, // ⭐ 添加SystemProgram
         } as any)
         .signers([this.merchantKeypair])
         .rpc();
 
       await this.connection.confirmTransaction(signature);
 
+      console.log(`   ✅ 产品信息更新成功（包含扩展字段）`);
+      console.log(`   📝 更新交易签名: ${signature}`);
+      console.log(`   🎯 更新内容:`);
+      console.log(`      - 产品名称: MacBook Pro M3 Max`);
+      console.log(`      - 产品描述: 最新款MacBook Pro，搭载M3 Max芯片...`);
+      console.log(`      - 关键词: 电脑, 苹果, MacBook, 专业`);
+      console.log(`      - 发货地点: 深圳市南山区科技园`);
+      console.log(`      - 图片视频: 4个新的媒体文件URL`);
+      console.log(`      - 销售区域: 5个国家和地区`);
+      console.log(`      - 物流方式: 5种物流选项`);
+
       return { success: true, signature };
     } catch (error) {
       const errorMsg = (error as Error).message;
+      console.log(`   ❌ 产品信息更新失败: ${errorMsg}`);
       return { success: false, error: errorMsg };
     }
   }
@@ -1735,7 +2040,6 @@ export class EnhancedBusinessFlowExecutor {
       const createOrderInstruction = await this.program.methods
         .createOrder(
           new anchor.BN(productId),
-          new anchor.BN(Date.now()),
           1, // quantity
           "测试地址", // shipping_address
           "原子购买测试", // notes
@@ -1944,7 +2248,6 @@ export class EnhancedBusinessFlowExecutor {
       const signature = await this.program.methods
         .createOrder(
           new anchor.BN(productId),
-          new anchor.BN(orderTimestamp),
           1, // 数量
           "北京市朝阳区", // 收货地址
           "请尽快发货，谢谢！", // 备注
@@ -2020,7 +2323,7 @@ export class EnhancedBusinessFlowExecutor {
         this.authority.publicKey
       );
 
-      const transferTokenAmount = 100 * Math.pow(10, 9); // 100 tokens
+      const transferTokenAmount = 200 * Math.pow(10, 9); // 200 tokens (增加余额以应对多次购买调用)
       const tokenTransferSignature = await transfer(
         this.connection,
         this.authority,
@@ -2029,7 +2332,7 @@ export class EnhancedBusinessFlowExecutor {
         this.authority.publicKey,
         transferTokenAmount
       );
-      console.log(`   💸 Token转移给买家: 100 DXDV`);
+      console.log(`   💸 Token转移给买家: ${this.formatTokenAmount(100)}`);
       console.log(`   📝 完整Token转移签名: ${tokenTransferSignature}`);
 
       // 实际购买操作 - 使用Token支付到托管账户
@@ -2040,7 +2343,7 @@ export class EnhancedBusinessFlowExecutor {
 
         console.log(`   🛍️ 购买实际创建的产品`);
         console.log(`   📦 产品账户: ${productAccount.toString()}`);
-        console.log(`   💰 购买金额: ${productPrice} DXDV Token`);
+        console.log(`   💰 购买金额: ${this.formatTokenAmount(productPrice)}`);
         console.log(`   🏪 商户: ${this.merchantKeypair?.publicKey.toString()}`);
         console.log(`   👤 买家: ${this.buyerKeypair.publicKey.toString()}`);
 
@@ -2059,7 +2362,7 @@ export class EnhancedBusinessFlowExecutor {
             console.log(`   ✅ 原子购买交易成功！`);
             console.log(`   📝 原子交易签名: ${atomicPurchaseResult.signature}`);
             console.log(`   🔒 订单账户: ${atomicPurchaseResult.orderAccount}`);
-            console.log(`   💰 支付金额: ${productPrice} DXDV`);
+            console.log(`   💰 支付金额: ${this.formatTokenAmount(productPrice)}`);
             console.log(`   💸 Token已转入程序托管账户`);
             console.log(`   🛍️ 订单状态: 已支付，等待发货`);
             console.log(`   ⚡ 原子性保证: 订单创建和支付在同一交易中完成`);
@@ -2094,7 +2397,7 @@ export class EnhancedBusinessFlowExecutor {
 
               console.log(`   ✅ Token支付成功！`);
               console.log(`   📝 支付交易签名: ${paymentSignature}`);
-              console.log(`   💰 ${productPrice} DXDV 已转入程序托管账户`);
+              console.log(`   💰 ${this.formatTokenAmount(productPrice)} 已转入程序托管账户`);
               console.log(`   🛍️ 订单状态: 已支付，等待发货`);
             } catch (paymentError) {
               console.log(`   ⚠️ Token支付失败: ${(paymentError as Error).message}`);
@@ -2102,18 +2405,22 @@ export class EnhancedBusinessFlowExecutor {
             }
           } else {
             console.log(`   ❌ 原子购买交易失败: ${atomicPurchaseResult.error}`);
-            console.log(`   💸 Token支付将通过智能合约购买指令处理: ${productPrice} DXDV`);
+            console.log(
+              `   💸 Token支付将通过智能合约购买指令处理: ${this.formatTokenAmount(productPrice)}`
+            );
             console.log(`   🛍️ 购买流程将在智能合约中完成Token转移和托管`);
           }
         } catch (error) {
           console.log(`   ❌ 购买订单创建失败: ${(error as Error).message}`);
-          console.log(`   💸 Token支付将通过智能合约购买指令处理: ${productPrice} DXDV`);
+          console.log(
+            `   💸 Token支付将通过智能合约购买指令处理: ${this.formatTokenAmount(productPrice)}`
+          );
           console.log(`   🛍️ 购买流程将在智能合约中完成Token转移和托管`);
         }
       } else {
         console.log(`   ⚠️ 没有可用的产品进行购买（产品创建失败）`);
         console.log(`   🛍️ 模拟购买商品: iPhone 15 Pro`);
-        console.log(`   💰 购买金额: 50 DXDV Token`);
+        console.log(`   💰 购买金额: ${this.formatTokenAmount(50)}`);
         console.log(`   🏪 商户: ${this.merchantKeypair?.publicKey.toString()}`);
         console.log(`   👤 买家: ${this.buyerKeypair.publicKey.toString()}`);
       }
@@ -2126,7 +2433,7 @@ export class EnhancedBusinessFlowExecutor {
       const buyerTokenBalance = await this.connection.getTokenAccountBalance(
         this.buyerTokenAccount
       );
-      console.log(`   🪙 买家Token余额: ${buyerTokenBalance.value.uiAmount} DXDV`);
+      console.log(`   🪙 买家Token余额: ${buyerTokenBalance.value.uiAmount} ${this.tokenSymbol}`);
 
       console.log(`   ✅ 买家创建和购买流程完成！`);
 
@@ -2211,7 +2518,7 @@ export class EnhancedBusinessFlowExecutor {
 
       // 执行退款指令
       const signature = await this.program.methods
-        .requestRefund(refundReason)
+        .refundOrder(refundReason)
         .accounts({
           order: orderPDA,
           programTokenAccount: programTokenAccountPDA,
@@ -2264,7 +2571,7 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   📝 申请时间: ${new Date().toLocaleString()}`);
       console.log(`   📸 退货凭证: 已上传商品照片和视频`);
       console.log(`   📋 退货状态: 等待商户审核`);
-      console.log(`   💰 退款金额: 50 DXDV Token`);
+      console.log(`   💰 退款金额: ${this.formatTokenAmount(50)}`);
     } catch (error) {
       console.error(`   ❌ 买家退货申请失败: ${(error as Error).message}`);
       throw error;
@@ -2308,16 +2615,20 @@ export class EnhancedBusinessFlowExecutor {
         if (refundResult.success) {
           console.log(`   ✅ 退款指令执行成功！`);
           console.log(`   📝 退款交易签名: ${refundResult.signature}`);
-          console.log(`   💰 退款金额: ${productPrice} DXDV`);
+          console.log(`   💰 退款金额: ${this.formatTokenAmount(productPrice)}`);
           console.log(`   🔄 Token已通过智能合约退回买家账户`);
         } else {
           console.log(`   ⚠️ 退款指令执行失败: ${refundResult.error}`);
-          console.log(`   💸 Token退款将通过智能合约退款指令处理: ${productPrice} DXDV`);
+          console.log(
+            `   💸 Token退款将通过智能合约退款指令处理: ${this.formatTokenAmount(productPrice)}`
+          );
           console.log(`   🔄 退款流程将在智能合约中完成Token转移和状态更新`);
         }
       } catch (error) {
         console.log(`   ⚠️ 退货指令执行失败: ${(error as Error).message}`);
-        console.log(`   �💸 Token退款将通过智能合约退款指令处理: ${productPrice} DXDV`);
+        console.log(
+          `   �💸 Token退款将通过智能合约退款指令处理: ${this.formatTokenAmount(productPrice)}`
+        );
         console.log(`   🔄 退款流程将在智能合约中完成Token转移和状态更新`);
       }
 
@@ -2333,14 +2644,18 @@ export class EnhancedBusinessFlowExecutor {
         const merchantTokenBalance = await this.connection.getTokenAccountBalance(
           this.merchantTokenAccount
         );
-        console.log(`   🪙 商户个人Token余额: ${merchantTokenBalance.value.uiAmount} DXDV`);
+        console.log(
+          `   🪙 商户个人Token余额: ${merchantTokenBalance.value.uiAmount} ${this.tokenSymbol}`
+        );
       }
 
       if (this.buyerTokenAccount) {
         const buyerTokenBalance = await this.connection.getTokenAccountBalance(
           this.buyerTokenAccount
         );
-        console.log(`   🪙 买家最终Token余额: ${buyerTokenBalance.value.uiAmount} DXDV`);
+        console.log(
+          `   🪙 买家最终Token余额: ${buyerTokenBalance.value.uiAmount} ${this.tokenSymbol}`
+        );
       }
 
       // 验证主程序托管余额
@@ -2352,7 +2667,7 @@ export class EnhancedBusinessFlowExecutor {
         const authorityBalance = await this.connection.getTokenAccountBalance(
           authorityTokenAccount
         );
-        console.log(`   🪙 主程序托管余额: ${authorityBalance.value.uiAmount} DXDV`);
+        console.log(`   🪙 主程序托管余额: ${authorityBalance.value.uiAmount} ${this.tokenSymbol}`);
       } catch (error) {
         console.log(`   ⚠️ 无法获取主程序托管余额`);
       }
@@ -2393,7 +2708,9 @@ export class EnhancedBusinessFlowExecutor {
 
       // Token释放将通过智能合约的确认收货指令处理
       const productPrice = this.BUSINESS_CONFIG.PRODUCTS[0].price; // iPhone 15 Pro的价格
-      console.log(`   💸 Token释放将通过智能合约确认收货指令处理: ${productPrice} DXDV`);
+      console.log(
+        `   💸 Token释放将通过智能合约确认收货指令处理: ${this.formatTokenAmount(productPrice)}`
+      );
       console.log(`   🔄 Token释放流程将在智能合约中完成转移和状态更新`);
 
       // 验证最终余额
@@ -2408,14 +2725,18 @@ export class EnhancedBusinessFlowExecutor {
         const merchantTokenBalance = await this.connection.getTokenAccountBalance(
           this.merchantTokenAccount
         );
-        console.log(`   🪙 商户个人Token余额: ${merchantTokenBalance.value.uiAmount} DXDV`);
+        console.log(
+          `   🪙 商户个人Token余额: ${merchantTokenBalance.value.uiAmount} ${this.tokenSymbol}`
+        );
       }
 
       if (this.buyerTokenAccount) {
         const buyerTokenBalance = await this.connection.getTokenAccountBalance(
           this.buyerTokenAccount
         );
-        console.log(`   🪙 买家最终Token余额: ${buyerTokenBalance.value.uiAmount} DXDV`);
+        console.log(
+          `   🪙 买家最终Token余额: ${buyerTokenBalance.value.uiAmount} ${this.tokenSymbol}`
+        );
       }
     } catch (error) {
       console.error(`   ❌ 买家确认收货失败: ${(error as Error).message}`);
@@ -2511,7 +2832,16 @@ export class EnhancedBusinessFlowExecutor {
       await this.step1_registerMerchantWithDeposit();
       await this.step2_withdrawPartialDeposit();
       await this.step3_createProducts();
-      await this.step3_1_initializeProgramTokenAccount();
+      // 步骤3.1: 程序Token账户已在支付系统初始化时创建，跳过
+      console.log("\n🔧 步骤3.1: 程序Token账户检查");
+      console.log("==================================================");
+      const [programTokenAccountPDA] = this.calculatePDA(["program_token_account"]);
+      const existingAccount = await this.connection.getAccountInfo(programTokenAccountPDA);
+      if (existingAccount) {
+        console.log(`   ✅ 程序Token账户已存在: ${programTokenAccountPDA.toString()}`);
+      } else {
+        console.log(`   ⚠️ 程序Token账户不存在，这不应该发生`);
+      }
       await this.step3_5_updateProductInfo();
       await this.step4_setupSearch();
       await this.step5_createBuyerAndPurchase();

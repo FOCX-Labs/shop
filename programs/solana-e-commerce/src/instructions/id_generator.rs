@@ -48,7 +48,7 @@ pub fn generate_product_id(ctx: Context<GenerateId>) -> Result<u64> {
             active_chunk.next_available = local_id + 1;
             merchant_account.last_local_id = local_id;
 
-            let global_id = active_chunk.start_id + local_id as u64;
+            let global_id = active_chunk.start_id + local_id;
 
             msg!(
                 "生成产品ID成功，商户: {}, 本地ID: {}, 全局ID: {}",
@@ -206,7 +206,7 @@ pub fn is_id_exists(ctx: Context<VerifyId>, id: u64) -> Result<bool> {
         return Ok(false);
     }
 
-    let local_id = (id - chunk.start_id) as u32;
+    let local_id = id - chunk.start_id;
     Ok(chunk.is_id_used(local_id))
 }
 
@@ -279,9 +279,9 @@ pub fn release_id(ctx: Context<ReleaseId>, id: u64) -> Result<()> {
         id >= chunk.start_id && id <= chunk.end_id,
         ErrorCode::InvalidId
     );
-    let offset = (id - chunk.start_id) as u32;
+    let offset = id - chunk.start_id;
     let byte_index = (offset / 8) as usize;
-    let bit_index = offset % 8;
+    let bit_index = (offset % 8) as u8;
     chunk.bitmap[byte_index] &= !(1 << bit_index);
     Ok(())
 }
@@ -333,7 +333,7 @@ pub fn allocate_id_in_chunk(
     }
     let mut found = false;
     let mut local_id = chunk.next_available;
-    for i in local_id..(ID_CHUNK_BITMAP_SIZE as u32 * 8) {
+    for i in local_id..(ID_CHUNK_BITMAP_SIZE as u64 * 8) {
         let byte_index = (i / 8) as usize;
         let bit_index = i % 8;
         if chunk.bitmap[byte_index] & (1 << bit_index) == 0 {
@@ -358,9 +358,9 @@ pub fn release_id_in_chunk(chunk: &mut Account<IdChunk>, id: u64) -> Result<()> 
         id >= chunk.start_id && id <= chunk.end_id,
         ErrorCode::InvalidId
     );
-    let offset = (id - chunk.start_id) as u32;
+    let offset = id - chunk.start_id;
     let byte_index = (offset / 8) as usize;
-    let bit_index = offset % 8;
+    let bit_index = (offset % 8) as u8;
     chunk.bitmap[byte_index] &= !(1 << bit_index);
     Ok(())
 }

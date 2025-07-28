@@ -172,19 +172,19 @@ export type SolanaECommerce = {
       ],
       "args": [
         {
-          "name": "priceRangeStart",
-          "type": "u64"
-        },
-        {
-          "name": "priceRangeEnd",
-          "type": "u64"
-        },
-        {
           "name": "productId",
           "type": "u64"
         },
         {
           "name": "price",
+          "type": "u64"
+        },
+        {
+          "name": "priceRangeStart",
+          "type": "u64"
+        },
+        {
+          "name": "priceRangeEnd",
           "type": "u64"
         }
       ]
@@ -395,6 +395,36 @@ export type SolanaECommerce = {
           }
         },
         {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "merchant"
+              }
+            ]
+          }
+        },
+        {
           "name": "systemConfig",
           "pda": {
             "seeds": [
@@ -413,7 +443,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -885,7 +918,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -1029,7 +1065,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -1384,10 +1423,6 @@ export type SolanaECommerce = {
           "type": "u64"
         },
         {
-          "name": "timestamp",
-          "type": "i64"
-        },
-        {
           "name": "quantity",
           "type": "u32"
         },
@@ -1728,7 +1763,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -1989,7 +2027,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -2315,25 +2356,20 @@ export type SolanaECommerce = {
       ]
     },
     {
-      "name": "initializePriceIndex",
+      "name": "initializeProgramTokenAccount",
       "discriminator": [
-        242,
-        209,
-        79,
-        4,
-        245,
-        6,
-        189,
-        234
+        195,
+        68,
+        47,
+        163,
+        248,
+        214,
+        47,
+        175
       ],
       "accounts": [
         {
-          "name": "payer",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "priceIndex",
+          "name": "programTokenAccount",
           "writable": true,
           "pda": {
             "seeds": [
@@ -2342,43 +2378,77 @@ export type SolanaECommerce = {
                 "value": [
                   112,
                   114,
-                  105,
-                  99,
-                  101,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
                   95,
-                  105,
-                  110,
-                  100,
+                  116,
+                  111,
+                  107,
                   101,
-                  120
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
                 ]
-              },
-              {
-                "kind": "arg",
-                "path": "priceRangeStart"
-              },
-              {
-                "kind": "arg",
-                "path": "priceRangeEnd"
               }
             ]
           }
+        },
+        {
+          "name": "programAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "paymentTokenMint"
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
         },
         {
           "name": "systemProgram",
           "address": "11111111111111111111111111111111"
         }
       ],
-      "args": [
-        {
-          "name": "priceRangeStart",
-          "type": "u64"
-        },
-        {
-          "name": "priceRangeEnd",
-          "type": "u64"
-        }
-      ]
+      "args": []
     },
     {
       "name": "initializeSalesIndex",
@@ -2545,7 +2615,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -2690,7 +2763,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -2878,6 +2954,106 @@ export type SolanaECommerce = {
       ]
     },
     {
+      "name": "refundOrder",
+      "discriminator": [
+        164,
+        168,
+        47,
+        144,
+        154,
+        1,
+        241,
+        255
+      ],
+      "accounts": [
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "programTokenAccount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyerTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "programAuthority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  97,
+                  117,
+                  116,
+                  104,
+                  111,
+                  114,
+                  105,
+                  116,
+                  121
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "buyer",
+          "signer": true
+        },
+        {
+          "name": "tokenProgram",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        }
+      ],
+      "args": [
+        {
+          "name": "refundReason",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "registerMerchantAtomic",
       "discriminator": [
         32,
@@ -2975,7 +3151,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -3233,252 +3412,6 @@ export type SolanaECommerce = {
       ]
     },
     {
-      "name": "requestRefund",
-      "discriminator": [
-        155,
-        77,
-        126,
-        53,
-        47,
-        81,
-        144,
-        82
-      ],
-      "accounts": [
-        {
-          "name": "order",
-          "writable": true
-        },
-        {
-          "name": "programTokenAccount",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  103,
-                  114,
-                  97,
-                  109,
-                  95,
-                  116,
-                  111,
-                  107,
-                  101,
-                  110,
-                  95,
-                  97,
-                  99,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "buyerTokenAccount",
-          "writable": true
-        },
-        {
-          "name": "programAuthority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  112,
-                  114,
-                  111,
-                  103,
-                  114,
-                  97,
-                  109,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "buyer",
-          "signer": true
-        },
-        {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": [
-        {
-          "name": "refundReason",
-          "type": "string"
-        }
-      ]
-    },
-    {
-      "name": "returnOrder",
-      "discriminator": [
-        118,
-        247,
-        207,
-        86,
-        42,
-        154,
-        15,
-        235
-      ],
-      "accounts": [
-        {
-          "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "buyer"
-              },
-              {
-                "kind": "arg",
-                "path": "merchantKey"
-              },
-              {
-                "kind": "arg",
-                "path": "productId"
-              },
-              {
-                "kind": "arg",
-                "path": "timestamp"
-              }
-            ]
-          }
-        },
-        {
-          "name": "orderStats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "merchant",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  101,
-                  114,
-                  99,
-                  104,
-                  97,
-                  110,
-                  116,
-                  95,
-                  105,
-                  110,
-                  102,
-                  111
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "merchant.owner",
-                "account": "merchant"
-              }
-            ]
-          }
-        },
-        {
-          "name": "programTokenAccount",
-          "writable": true
-        },
-        {
-          "name": "buyerTokenAccount",
-          "writable": true
-        },
-        {
-          "name": "programAuthority"
-        },
-        {
-          "name": "authority",
-          "signer": true
-        },
-        {
-          "name": "tokenProgram",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        }
-      ],
-      "args": [
-        {
-          "name": "buyer",
-          "type": "pubkey"
-        },
-        {
-          "name": "merchantKey",
-          "type": "pubkey"
-        },
-        {
-          "name": "productId",
-          "type": "u64"
-        },
-        {
-          "name": "timestamp",
-          "type": "i64"
-        },
-        {
-          "name": "returnReason",
-          "type": {
-            "option": "string"
-          }
-        }
-      ]
-    },
-    {
       "name": "splitPriceNode",
       "discriminator": [
         234,
@@ -3586,7 +3519,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -3851,6 +3787,40 @@ export type SolanaECommerce = {
           }
         },
         {
+          "name": "productExtended",
+          "writable": true,
+          "optional": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  100,
+                  117,
+                  99,
+                  116,
+                  95,
+                  101,
+                  120,
+                  116,
+                  101,
+                  110,
+                  100,
+                  101,
+                  100
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "productId"
+              }
+            ]
+          }
+        },
+        {
           "name": "paymentConfig",
           "pda": {
             "seeds": [
@@ -3875,6 +3845,10 @@ export type SolanaECommerce = {
               }
             ]
           }
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -4228,7 +4202,10 @@ export type SolanaECommerce = {
                   110,
                   102,
                   105,
-                  103
+                  103,
+                  95,
+                  118,
+                  50
                 ]
               }
             ]
@@ -5056,7 +5033,7 @@ export type SolanaECommerce = {
           },
           {
             "name": "nextAvailable",
-            "type": "u32"
+            "type": "u64"
           },
           {
             "name": "bitmap",
@@ -5277,7 +5254,7 @@ export type SolanaECommerce = {
           },
           {
             "name": "lastLocalId",
-            "type": "u32"
+            "type": "u64"
           },
           {
             "name": "activeChunk",
@@ -5910,6 +5887,10 @@ export type SolanaECommerce = {
           {
             "name": "autoConfirmDays",
             "type": "u32"
+          },
+          {
+            "name": "externalProgramId",
+            "type": "pubkey"
           }
         ]
       }

@@ -18,7 +18,7 @@ solana_e_commerce = "5XZ74thixMBX2tQN9P3yLTugUK4YMdRLznDNa2mRdGNT"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "devnet"
+cluster = "localnet"
 wallet = "~/.config/solana/id.json"
 
 [scripts]

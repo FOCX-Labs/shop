@@ -84,7 +84,7 @@ pub struct UpdateOrderStatus<'info> {
 
 // 买家请求退款（直接退款）
 #[derive(Accounts)]
-pub struct RequestRefund<'info> {
+pub struct RefundOrder<'info> {
     #[account(
         mut,
         constraint = order.buyer == buyer.key() @ ErrorCode::Unauthorized
@@ -116,47 +116,6 @@ pub struct RequestRefund<'info> {
 }
 
 // 商家批准退款指令已移除，买家可直接退款
-
-// 退款订单（保持向后兼容性，已废弃）
-#[derive(Accounts)]
-#[instruction(buyer: Pubkey, merchant_key: Pubkey, product_id: u64, timestamp: i64)]
-pub struct RefundOrder<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"order",
-            buyer.as_ref(),
-            merchant_key.as_ref(),
-            product_id.to_le_bytes().as_ref(),
-            timestamp.to_le_bytes().as_ref()
-        ],
-        bump = order.bump
-    )]
-    pub order: Account<'info, Order>,
-
-    #[account(
-        mut,
-        seeds = [b"order_stats"],
-        bump
-    )]
-    pub order_stats: Account<'info, OrderStats>,
-
-    #[account(
-        seeds = [b"merchant_info", merchant.owner.as_ref()],
-        bump = merchant.bump,
-        constraint = merchant.owner == authority.key() @ ErrorCode::Unauthorized
-    )]
-    pub merchant: Account<'info, Merchant>,
-
-    #[account(mut)]
-    pub merchant_token_account: Account<'info, TokenAccount>,
-
-    #[account(mut)]
-    pub buyer_token_account: Account<'info, TokenAccount>,
-
-    pub authority: Signer<'info>,
-    pub token_program: Program<'info, Token>,
-}
 
 // 初始化订单统计
 #[derive(Accounts)]
@@ -211,7 +170,7 @@ pub struct ConfirmDelivery<'info> {
 
     // 系统配置账户（获取保证金代币mint和平台手续费配置）
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, crate::SystemConfig>,
@@ -238,50 +197,6 @@ pub struct ConfirmDelivery<'info> {
     pub program_authority: AccountInfo<'info>,
 
     pub buyer: Signer<'info>,
-    pub token_program: Program<'info, Token>,
-}
-
-// 退货
-#[derive(Accounts)]
-#[instruction(buyer: Pubkey, merchant_key: Pubkey, product_id: u64, timestamp: i64)]
-pub struct ReturnOrder<'info> {
-    #[account(
-        mut,
-        seeds = [
-            b"order",
-            buyer.as_ref(),
-            merchant_key.as_ref(),
-            product_id.to_le_bytes().as_ref(),
-            timestamp.to_le_bytes().as_ref()
-        ],
-        bump = order.bump
-    )]
-    pub order: Account<'info, Order>,
-
-    #[account(
-        mut,
-        seeds = [b"order_stats"],
-        bump
-    )]
-    pub order_stats: Account<'info, OrderStats>,
-
-    #[account(
-        seeds = [b"merchant_info", merchant.owner.as_ref()],
-        bump = merchant.bump,
-        constraint = merchant.owner == authority.key() @ ErrorCode::Unauthorized
-    )]
-    pub merchant: Account<'info, Merchant>,
-
-    #[account(mut)]
-    pub program_token_account: Account<'info, TokenAccount>,
-
-    #[account(mut)]
-    pub buyer_token_account: Account<'info, TokenAccount>,
-
-    /// CHECK: This is the program authority for token transfers
-    pub program_authority: AccountInfo<'info>,
-
-    pub authority: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
 
@@ -315,7 +230,6 @@ pub fn initialize_order_stats(ctx: Context<InitializeOrderStats>) -> Result<()> 
 pub fn create_order(
     ctx: Context<CreateOrder>,
     product_id: u64,
-    timestamp: i64,
     quantity: u32,
     shipping_address: String,
     notes: String,
@@ -327,6 +241,9 @@ pub fn create_order(
     let merchant = &ctx.accounts.merchant;
     let buyer = &ctx.accounts.buyer;
     let user_purchase_count = &mut ctx.accounts.user_purchase_count;
+
+    // 获取当前时间戳
+    let current_timestamp = Clock::get()?.unix_timestamp;
 
     // 验证产品ID匹配
     require!(product.id == product_id, ErrorCode::InvalidProduct);
@@ -343,7 +260,6 @@ pub fn create_order(
     }
 
     let _purchase_count = user_purchase_count.increment_count()?;
-    let current_time = Clock::get()?.unix_timestamp;
 
     // 初始化订单 - 移除id字段，使用PDA确保唯一性
     order.buyer = buyer.key();
@@ -356,8 +272,8 @@ pub fn create_order(
     order.status = OrderManagementStatus::Pending;
     order.shipping_address = shipping_address;
     order.notes = notes;
-    order.created_at = current_time;
-    order.updated_at = current_time;
+    order.created_at = current_timestamp;
+    order.updated_at = current_timestamp;
     order.confirmed_at = None;
     order.shipped_at = None;
     order.delivered_at = None;
@@ -375,7 +291,7 @@ pub fn create_order(
 
     msg!(
         "订单创建成功: ID {}, 买家: {}, 商户: {}, 商品: {}, 数量: {}, 总金额: {} lamports",
-        timestamp,
+        current_timestamp,
         buyer.key(),
         merchant.owner,
         product_id,
@@ -430,8 +346,8 @@ pub fn update_order_status(
     Ok(())
 }
 
-// 买家直接退款（简化流程）
-pub fn request_refund(ctx: Context<RequestRefund>, refund_reason: String) -> Result<()> {
+// 买家直接退款
+pub fn refund_order(ctx: Context<RefundOrder>, refund_reason: String) -> Result<()> {
     let order = &mut ctx.accounts.order;
     // 移除order_stats引用 - 统计功能已简化
 
@@ -478,52 +394,6 @@ pub fn request_refund(ctx: Context<RequestRefund>, refund_reason: String) -> Res
 }
 
 // 商家批准退款函数已移除，买家可直接退款
-
-#[deprecated(note = "Use request_refund() and approve_refund() instead")]
-pub fn refund_order(
-    ctx: Context<RefundOrder>,
-    _buyer: Pubkey,
-    _merchant_key: Pubkey,
-    _product_id: u64,
-    timestamp: i64,
-) -> Result<()> {
-    let order = &mut ctx.accounts.order;
-    let order_stats = &mut ctx.accounts.order_stats;
-
-    require!(order.can_request_refund(), ErrorCode::OrderCannotBeRefunded);
-
-    // 执行代币退款
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.merchant_token_account.to_account_info(),
-        to: ctx.accounts.buyer_token_account.to_account_info(),
-        authority: ctx.accounts.authority.to_account_info(),
-    };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-    transfer(cpi_ctx, order.total_amount)?;
-
-    let old_status = order.status.clone();
-    let current_time = Clock::get()?.unix_timestamp;
-
-    // 更新为退款状态
-    order.update_status(OrderManagementStatus::Refunded, current_time)?;
-
-    // 更新统计信息
-    order_stats.update_for_status_change(
-        &old_status,
-        &OrderManagementStatus::Refunded,
-        order.total_amount,
-    );
-
-    msg!(
-        "订单退款成功: ID {}, 退款金额: {} tokens",
-        timestamp,
-        order.total_amount
-    );
-
-    Ok(())
-}
 
 pub fn get_order_stats(ctx: Context<GetOrderStats>) -> Result<()> {
     let order_stats = &ctx.accounts.order_stats;
@@ -600,19 +470,60 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     let program_signer_seeds = &[b"program_authority".as_ref(), &[program_authority_bump]];
     let program_signer = &[&program_signer_seeds[..]];
 
-    let cpi_accounts = Transfer {
+    // 1. CPI调用外部程序的add_rewards指令，直接将平台手续费转入外部程序
+    if platform_fee > 0 {
+        // 构建CPI调用的账户列表
+        let add_rewards_accounts = vec![
+            ctx.accounts.program_token_account.to_account_info(),
+            ctx.accounts.token_program.to_account_info(),
+        ];
+
+        let add_rewards_data = {
+            let mut data = Vec::new();
+            // 根据外部程序的指令格式构建数据
+            // 这里需要根据实际的add_rewards指令格式来构建
+            data.extend_from_slice(&platform_fee.to_le_bytes());
+            data
+        };
+
+        let add_rewards_instruction = anchor_lang::solana_program::instruction::Instruction {
+            program_id: system_config.external_program_id,
+            accounts: add_rewards_accounts
+                .iter()
+                .map(
+                    |acc| anchor_lang::solana_program::instruction::AccountMeta {
+                        pubkey: acc.key(),
+                        is_signer: acc.is_signer,
+                        is_writable: acc.is_writable,
+                    },
+                )
+                .collect(),
+            data: add_rewards_data,
+        };
+
+        anchor_lang::solana_program::program::invoke_signed(
+            &add_rewards_instruction,
+            &add_rewards_accounts,
+            program_signer,
+        )?;
+    }
+
+    // 3. 转移剩余金额（商户实收）到商户保证金账户
+    let merchant_transfer_accounts = Transfer {
         from: ctx.accounts.program_token_account.to_account_info(),
         to: ctx.accounts.deposit_escrow_account.to_account_info(),
         authority: ctx.accounts.program_authority.to_account_info(),
     };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_ctx = CpiContext::new_with_signer(cpi_program, cpi_accounts, program_signer);
+    let merchant_cpi_program = ctx.accounts.token_program.to_account_info();
+    let merchant_cpi_ctx = CpiContext::new_with_signer(
+        merchant_cpi_program,
+        merchant_transfer_accounts,
+        program_signer,
+    );
+    transfer(merchant_cpi_ctx, merchant_amount)?;
 
-    // 转移全部金额到商户保证金账户（简化，不扣除手续费）
-    transfer(cpi_ctx, total_amount)?;
-
-    // 更新商户保证金余额
-    merchant_info.add_deposit(total_amount)?;
+    // 更新商户保证金余额（只添加商户实收金额，不包括平台手续费）
+    merchant_info.add_deposit(merchant_amount)?;
 
     let old_status = order.status.clone();
     let current_time = Clock::get()?.unix_timestamp;
@@ -660,73 +571,7 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     Ok(())
 }
 
-pub fn return_order(
-    ctx: Context<ReturnOrder>,
-    _buyer: Pubkey,
-    _merchant_key: Pubkey,
-    _product_id: u64,
-    timestamp: i64,
-    return_reason: Option<String>,
-) -> Result<()> {
-    let order = &mut ctx.accounts.order;
-    let order_stats = &mut ctx.accounts.order_stats;
-
-    // 验证订单状态必须是已送达
-    require!(
-        order.status == OrderManagementStatus::Delivered,
-        ErrorCode::InvalidOrderStatusTransition
-    );
-
-    // 验证退货原因长度（如果提供）
-    if let Some(ref reason) = return_reason {
-        require!(reason.len() <= 500, ErrorCode::InvalidOrderNotesLength);
-    }
-
-    // 执行代币退货：从主程序托管账户退回给买家
-    let cpi_accounts = Transfer {
-        from: ctx.accounts.program_token_account.to_account_info(),
-        to: ctx.accounts.buyer_token_account.to_account_info(),
-        authority: ctx.accounts.program_authority.to_account_info(),
-    };
-    let cpi_program = ctx.accounts.token_program.to_account_info();
-    let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
-
-    transfer(cpi_ctx, order.total_amount)?;
-
-    let old_status = order.status.clone();
-    let current_time = Clock::get()?.unix_timestamp;
-
-    // 更新为已退货状态
-    order.update_status(OrderManagementStatus::Refunded, current_time)?;
-
-    // 更新统计信息
-    order_stats.update_for_status_change(
-        &old_status,
-        &OrderManagementStatus::Refunded,
-        order.total_amount,
-    );
-
-    // 验证代币退款是否成功
-    let buyer_balance_after = ctx.accounts.buyer_token_account.amount;
-    let program_balance_after = ctx.accounts.program_token_account.amount;
-
-    let reason_msg = return_reason.unwrap_or_else(|| "无退货原因".to_string());
-    msg!(
-        "退货成功: 订单ID {}, 退货金额: {} tokens, 退货原因: {}",
-        timestamp,
-        order.total_amount,
-        reason_msg
-    );
-    msg!(
-        "代币余额验证: 买家账户余额: {}, 主程序托管账户余额: {}",
-        buyer_balance_after,
-        program_balance_after
-    );
-
-    Ok(())
-}
-
-/// 自动确认收货（系统调用）
+/// 自动确认收货（商户或管理员调用）
 #[derive(Accounts)]
 pub struct AutoConfirmDelivery<'info> {
     #[account(mut)]
@@ -739,16 +584,23 @@ pub struct AutoConfirmDelivery<'info> {
     )]
     pub order_stats: Account<'info, OrderStats>,
 
+    // 商户账户（用于权限验证）
+    #[account(
+        seeds = [b"merchant_info", merchant.owner.as_ref()],
+        bump = merchant.bump
+    )]
+    pub merchant: Account<'info, Merchant>,
+
     // 系统配置账户（获取自动确认天数）
     #[account(
-        seeds = [b"system_config"],
+        seeds = [b"system_config_v2"],
         bump
     )]
     pub system_config: Account<'info, crate::SystemConfig>,
 
-    // 系统权限账户（只有系统管理员可以调用）
+    // 调用者（商户或系统管理员）
     #[account(
-        constraint = authority.key() == system_config.authority @ ErrorCode::Unauthorized
+        constraint = authority.key() == merchant.owner || authority.key() == system_config.authority @ ErrorCode::Unauthorized
     )]
     pub authority: Signer<'info>,
 }
@@ -778,11 +630,19 @@ pub fn auto_confirm_delivery(ctx: Context<AutoConfirmDelivery>) -> Result<()> {
         order.total_amount,
     );
 
+    let caller_type = if ctx.accounts.authority.key() == ctx.accounts.system_config.authority {
+        "系统管理员"
+    } else {
+        "商户"
+    };
+
     msg!(
-        "订单自动确认收货成功: 订单ID {}, 买家: {}, 商户: {}, 发货时间: {:?}, 确认时间: {}",
+        "订单自动确认收货成功: 订单ID {}, 买家: {}, 商户: {}, 调用者: {} ({}), 发货时间: {:?}, 确认时间: {}",
         order.product_id,
         order.buyer,
         order.merchant,
+        ctx.accounts.authority.key(),
+        caller_type,
         order.shipped_at,
         current_time
     );

@@ -2,6 +2,52 @@ use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
+/// 计算价格范围的起始值
+/// 使用对数算法：给定价格P，找到满足 2^n ≤ P < 2^(n+1) 的n值
+/// 设置 price_range_start = 2^n
+pub fn calculate_price_range_start(price: u64) -> u64 {
+    if price == 0 {
+        return 0;
+    }
+    if price == 1 {
+        return 1;
+    }
+
+    // 找到最大的n，使得2^n <= price
+    // 使用更直观的方法计算 floor(log2(price))
+    let mut n = 0;
+    let mut temp = price;
+    while temp > 1 {
+        temp >>= 1;
+        n += 1;
+    }
+    // 现在 n 就是 floor(log2(price))
+    // 对于price=15: floor(log2(15)) = 3, 所以 2^3 = 8
+    1u64 << n
+}
+
+/// 计算价格范围的结束值
+/// 设置 price_range_end = 2^(n+1)
+pub fn calculate_price_range_end(price: u64) -> u64 {
+    if price == 0 {
+        return 0;
+    }
+    if price == 1 {
+        return 1;
+    }
+
+    // 找到最大的n，使得2^n <= price
+    let mut n = 0;
+    let mut temp = price;
+    while temp > 1 {
+        temp >>= 1;
+        n += 1;
+    }
+    // price_range_end = 2^(n+1)
+    // 对于price=15: n=3, 所以 2^(3+1) = 2^4 = 16
+    1u64 << (n + 1)
+}
+
 #[derive(Accounts)]
 #[instruction(product_id: u64)]
 pub struct RemoveProductFromPriceIndex<'info> {
@@ -179,65 +225,65 @@ pub fn should_rebalance_price_tree(node: &Account<PriceIndexNode>) -> bool {
 }
 
 // ============================================================================
-// init_if_needed 版本的指令：供product.rs模块使用
+// 智能价格索引指令：自动计算价格范围并管理索引
 // ============================================================================
 
-/// 价格索引初始化（如果需要）的账户结构
-#[derive(Accounts)]
-#[instruction(price_range_start: u64, price_range_end: u64)]
-pub struct InitializePriceIndexIfNeeded<'info> {
-    #[account(mut)]
-    pub payer: Signer<'info>,
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    #[account(
-        init_if_needed,
-        payer = payer,
-        space = 8 + PriceIndexNode::INIT_SPACE,
-        seeds = [
-            b"price_index",
-            price_range_start.to_le_bytes().as_ref(),
-            price_range_end.to_le_bytes().as_ref()
-        ],
-        bump
-    )]
-    pub price_index: Account<'info, PriceIndexNode>,
+    #[test]
+    fn test_price_range_calculation() {
+        // 测试用例：价格=15时
+        // floor(log2(15)) = 3，所以 2^3=8 <= 15 < 2^4=16
+        // price_range_start=8，price_range_end=16
+        assert_eq!(calculate_price_range_start(15), 8);
+        assert_eq!(calculate_price_range_end(15), 16);
 
-    pub system_program: Program<'info, System>,
-}
+        // 测试用例：价格=1时，特殊情况
+        assert_eq!(calculate_price_range_start(1), 1);
+        assert_eq!(calculate_price_range_end(1), 1);
 
-/// 初始化价格索引（如果需要）
-pub fn initialize_price_index_if_needed(
-    ctx: Context<InitializePriceIndexIfNeeded>,
-    price_range_start: u64,
-    price_range_end: u64,
-) -> Result<()> {
-    let price_index = &mut ctx.accounts.price_index;
+        // 测试用例：价格=8时
+        // floor(log2(8)) = 3，所以 2^3=8 <= 8 < 2^4=16
+        // price_range_start=8，price_range_end=16
+        assert_eq!(calculate_price_range_start(8), 8);
+        assert_eq!(calculate_price_range_end(8), 16);
 
-    // 如果是新创建的账户，初始化数据
-    if price_index.price_range_start == 0 && price_index.price_range_end == 0 {
-        price_index.price_range_start = price_range_start;
-        price_index.price_range_end = price_range_end;
-        price_index.product_ids = Vec::new();
-        price_index.left_child = None;
-        price_index.right_child = None;
-        price_index.parent = None;
-        price_index.height = 0;
-        price_index.bump = ctx.bumps.price_index;
+        // 测试用例：价格=16时
+        // floor(log2(16)) = 4，所以 2^4=16 <= 16 < 2^5=32
+        // price_range_start=16，price_range_end=32
+        assert_eq!(calculate_price_range_start(16), 16);
+        assert_eq!(calculate_price_range_end(16), 32);
 
-        msg!(
-            "价格索引初始化完成，范围: {} - {}",
-            price_range_start,
-            price_range_end
-        );
+        // 测试用例：价格=0时，特殊情况
+        assert_eq!(calculate_price_range_start(0), 0);
+        assert_eq!(calculate_price_range_end(0), 0);
+
+        // 测试用例：价格=2时
+        // floor(log2(2)) = 1，所以 2^1=2 <= 2 < 2^2=4
+        // price_range_start=2，price_range_end=4
+        assert_eq!(calculate_price_range_start(2), 2);
+        assert_eq!(calculate_price_range_end(2), 4);
+
+        // 测试用例：价格=7时
+        // floor(log2(7)) = 2，所以 2^2=4 <= 7 < 2^3=8
+        // price_range_start=4，price_range_end=8
+        assert_eq!(calculate_price_range_start(7), 4);
+        assert_eq!(calculate_price_range_end(7), 8);
+
+        // 测试用例：价格=50时
+        // floor(log2(50)) = 5，所以 2^5=32 <= 50 < 2^6=64
+        // price_range_start=32，price_range_end=64
+        assert_eq!(calculate_price_range_start(50), 32);
+        assert_eq!(calculate_price_range_end(50), 64);
     }
-
-    Ok(())
 }
 
-/// 添加产品到价格索引（如果需要则先初始化）的账户结构
+/// 智能价格索引账户结构（使用Anchor标准方法）
 #[derive(Accounts)]
-#[instruction(price_range_start: u64, price_range_end: u64, product_id: u64, price: u64)]
-pub struct AddProductToPriceIndexIfNeeded<'info> {
+#[instruction(product_id: u64, price: u64, price_range_start: u64, price_range_end: u64)]
+pub struct AddProductToPriceIndex<'info> {
     #[account(mut)]
     pub payer: Signer<'info>,
 
@@ -257,15 +303,24 @@ pub struct AddProductToPriceIndexIfNeeded<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 添加产品到价格索引（如果需要则先初始化）
-pub fn add_product_to_price_index_if_needed(
-    ctx: Context<AddProductToPriceIndexIfNeeded>,
-    price_range_start: u64,
-    price_range_end: u64,
+/// 智能添加产品到价格索引
+pub fn add_product_to_price_index(
+    ctx: Context<AddProductToPriceIndex>,
     product_id: u64,
     price: u64,
+    price_range_start: u64,
+    price_range_end: u64,
 ) -> Result<()> {
     let price_index = &mut ctx.accounts.price_index;
+
+    // 验证传入的价格范围是否与基于价格计算的范围一致
+    let expected_start = calculate_price_range_start(price);
+    let expected_end = calculate_price_range_end(price);
+
+    require!(
+        price_range_start == expected_start && price_range_end == expected_end,
+        ErrorCode::InvalidPriceRange
+    );
 
     // 如果是新创建的账户，先初始化
     if price_index.price_range_start == 0 && price_index.price_range_end == 0 {
@@ -279,7 +334,8 @@ pub fn add_product_to_price_index_if_needed(
         price_index.bump = ctx.bumps.price_index;
 
         msg!(
-            "价格索引初始化完成，范围: {} - {}",
+            "✅ 新价格索引自动创建: 价格 {} → 范围 [{}, {}]",
+            price,
             price_range_start,
             price_range_end
         );
@@ -293,10 +349,11 @@ pub fn add_product_to_price_index_if_needed(
 
     // 检查产品是否已存在
     if price_index.product_ids.contains(&product_id) {
-        return Ok(()); // 已存在，跳过
+        msg!("产品 {} 已存在于价格索引中，跳过添加", product_id);
+        return Ok(());
     }
 
-    // 检查索引是否已满
+    // 检查索引容量
     if price_index.product_ids.len() >= 1000 {
         return Err(ErrorCode::ShardIsFull.into());
     }
@@ -305,10 +362,11 @@ pub fn add_product_to_price_index_if_needed(
     price_index.product_ids.push(product_id);
 
     msg!(
-        "产品 {} 已添加到价格索引 [{}, {}]",
+        "✅ 产品 {} 已添加到价格索引 [{}, {}]，当前产品数: {}",
         product_id,
         price_range_start,
-        price_range_end
+        price_range_end,
+        price_index.product_ids.len()
     );
 
     Ok(())

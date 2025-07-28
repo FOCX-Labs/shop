@@ -29,7 +29,7 @@ impl GlobalIdRoot {
 pub struct MerchantIdAccount {
     pub merchant_id: u32,
     pub last_chunk_index: u32,
-    pub last_local_id: u32,
+    pub last_local_id: u64,
     pub active_chunk: Pubkey,
     #[max_len(100)]
     pub unused_chunks: Vec<Pubkey>,
@@ -49,7 +49,7 @@ pub struct IdChunk {
     pub chunk_index: u32,
     pub start_id: u64,
     pub end_id: u64,
-    pub next_available: u32,
+    pub next_available: u64,
     #[max_len(1250)]
     pub bitmap: Vec<u8>, // 改为Vec<u8>以避免栈溢出，最大1250字节
     pub bump: u8,
@@ -64,30 +64,30 @@ impl IdChunk {
         ]
     }
 
-    pub fn capacity(&self) -> u32 {
-        ((self.end_id - self.start_id) + 1) as u32
+    pub fn capacity(&self) -> u64 {
+        (self.end_id - self.start_id) + 1
     }
 
-    pub fn is_id_used(&self, local_id: u32) -> bool {
+    pub fn is_id_used(&self, local_id: u64) -> bool {
         let byte_index = (local_id / 8) as usize;
-        let bit_index = local_id % 8;
+        let bit_index = (local_id % 8) as u8;
         if byte_index >= self.bitmap.len() {
             return false;
         }
         (self.bitmap[byte_index] >> bit_index) & 1 == 1
     }
 
-    pub fn mark_id_used(&mut self, local_id: u32) {
+    pub fn mark_id_used(&mut self, local_id: u64) {
         let byte_index = (local_id / 8) as usize;
-        let bit_index = local_id % 8;
+        let bit_index = (local_id % 8) as u8;
         if byte_index < self.bitmap.len() {
             self.bitmap[byte_index] |= 1 << bit_index;
         }
     }
 
-    pub fn clear_id(&mut self, local_id: u32) {
+    pub fn clear_id(&mut self, local_id: u64) {
         let byte_index = (local_id / 8) as usize;
-        let bit_index = local_id % 8;
+        let bit_index = (local_id % 8) as u8;
         if byte_index < self.bitmap.len() {
             self.bitmap[byte_index] &= !(1 << bit_index);
         }

@@ -5,7 +5,6 @@ pub mod instructions;
 pub mod state;
 pub mod utils;
 
-use instructions::order::RequestRefund;
 use instructions::*;
 use state::{OrderManagementStatus, SupportedToken};
 
@@ -208,6 +207,13 @@ pub mod solana_e_commerce {
         instructions::payment::close_payment_config(ctx, force)
     }
 
+    // 程序Token账户初始化指令
+    pub fn initialize_program_token_account(
+        ctx: Context<InitializeProgramTokenAccount>,
+    ) -> Result<()> {
+        instructions::payment::initialize_program_token_account(ctx)
+    }
+
     // 托管购买商品指令 - 集成订单创建
     pub fn purchase_product_escrow(
         ctx: Context<PurchaseProductEscrow>,
@@ -254,31 +260,21 @@ pub mod solana_e_commerce {
     }
 
     // 价格索引管理指令
-    pub fn initialize_price_index(
-        ctx: Context<InitializePriceIndexIfNeeded>,
-        price_range_start: u64,
-        price_range_end: u64,
-    ) -> Result<()> {
-        instructions::price_index::initialize_price_index_if_needed(
-            ctx,
-            price_range_start,
-            price_range_end,
-        )
-    }
 
+    // 智能价格索引指令
     pub fn add_product_to_price_index(
-        ctx: Context<AddProductToPriceIndexIfNeeded>,
-        price_range_start: u64,
-        price_range_end: u64,
+        ctx: Context<AddProductToPriceIndex>,
         product_id: u64,
         price: u64,
+        price_range_start: u64,
+        price_range_end: u64,
     ) -> Result<()> {
-        instructions::price_index::add_product_to_price_index_if_needed(
+        instructions::price_index::add_product_to_price_index(
             ctx,
-            price_range_start,
-            price_range_end,
             product_id,
             price,
+            price_range_start,
+            price_range_end,
         )
     }
 
@@ -385,7 +381,6 @@ pub mod solana_e_commerce {
     pub fn create_order(
         ctx: Context<CreateOrder>,
         product_id: u64,
-        timestamp: i64,
         quantity: u32,
         shipping_address: String,
         notes: String,
@@ -394,7 +389,6 @@ pub mod solana_e_commerce {
         instructions::order::create_order(
             ctx,
             product_id,
-            timestamp,
             quantity,
             shipping_address,
             notes,
@@ -411,8 +405,8 @@ pub mod solana_e_commerce {
     }
 
     // 买家请求退款
-    pub fn request_refund(ctx: Context<RequestRefund>, refund_reason: String) -> Result<()> {
-        instructions::order::request_refund(ctx, refund_reason)
+    pub fn refund_order(ctx: Context<RefundOrder>, refund_reason: String) -> Result<()> {
+        instructions::order::refund_order(ctx, refund_reason)
     }
 
     // 商家批准退款指令已移除，买家可直接退款
@@ -428,24 +422,6 @@ pub mod solana_e_commerce {
     // 自动确认收货（系统调用）
     pub fn auto_confirm_delivery(ctx: Context<AutoConfirmDelivery>) -> Result<()> {
         instructions::order::auto_confirm_delivery(ctx)
-    }
-
-    pub fn return_order(
-        ctx: Context<ReturnOrder>,
-        buyer: Pubkey,
-        merchant_key: Pubkey,
-        product_id: u64,
-        timestamp: i64,
-        return_reason: Option<String>,
-    ) -> Result<()> {
-        instructions::order::return_order(
-            ctx,
-            buyer,
-            merchant_key,
-            product_id,
-            timestamp,
-            return_reason,
-        )
     }
 
     // ==================== 保证金管理指令 ====================
@@ -503,6 +479,8 @@ pub struct SystemConfig {
     pub platform_fee_recipient: Pubkey, // 平台手续费接收账户
     // 新增自动确认收货配置
     pub auto_confirm_days: u32, // 自动确认收货天数（默认30天）
+    // 新增外部程序ID配置
+    pub external_program_id: Pubkey, // 外部程序ID，用于CPI调用add_rewards
 }
 
 impl Default for SystemConfig {
@@ -513,14 +491,16 @@ impl Default for SystemConfig {
             max_keywords_per_product: 10,
             chunk_size: 10_000,
             bloom_filter_size: 256,
-            // 默认保证金配置：1000 Token (精度从mint账户动态获取)
-            merchant_deposit_required: 1000 * 1_000_000, // 1000 Token (假设6位精度)
-            deposit_token_mint: Pubkey::default(),       // 需要在初始化时设置
+            // 默认保证金配置：基础单位，需要在初始化时根据Token精度动态计算
+            merchant_deposit_required: 1000, // 基础单位，实际使用时需要根据Token精度转换
+            deposit_token_mint: Pubkey::default(), // 需要在初始化时设置
             // 默认平台手续费配置
             platform_fee_rate: 40,                     // 0.4% (40基点)
             platform_fee_recipient: Pubkey::default(), // 需要在初始化时设置
             // 默认自动确认收货配置
             auto_confirm_days: 30, // 30天自动确认收货
+            // 默认外部程序ID配置
+            external_program_id: Pubkey::default(), // 需要在初始化时设置
         }
     }
 }
@@ -541,9 +521,21 @@ impl SystemConfig {
         self.deposit_token_mint = token_mint;
     }
 
-    /// 从mint账户获取代币精度（需要在指令中调用）
-    /// 这个方法需要在有mint账户访问权限的指令中使用
-    pub fn get_deposit_token_decimals_from_mint(mint_account: &anchor_spl::token::Mint) -> u8 {
-        mint_account.decimals
+    /// 根据Token精度计算实际的保证金要求
+    ///
+    /// # 参数
+    /// - `base_amount`: 基础金额（如1000）
+    /// - `decimals`: Token精度（从mint账户获取）
+    ///
+    /// # 返回
+    /// 转换后的最小单位金额
+    pub fn calculate_deposit_with_decimals(base_amount: u64, decimals: u8) -> u64 {
+        base_amount.saturating_mul(10_u64.saturating_pow(decimals as u32))
+    }
+
+    /// 设置保证金要求（根据Token精度动态计算）
+    pub fn set_deposit_requirement_with_decimals(&mut self, base_amount: u64, decimals: u8) {
+        self.merchant_deposit_required =
+            Self::calculate_deposit_with_decimals(base_amount, decimals);
     }
 }
