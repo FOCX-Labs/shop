@@ -144,8 +144,11 @@ pub fn create_product_base(
     payment_token: Pubkey,
     shipping_location: String,
 ) -> Result<u64> {
-    // 验证输入参数
-    require!(keywords.len() <= 3, ErrorCode::TooManyKeywords);
+    // 验证输入参数 - 创建时限制为3个关键词（考虑指令账户大小）
+    require!(
+        keywords.len() <= MAX_KEYWORDS_PER_PRODUCT_CREATE,
+        ErrorCode::TooManyKeywords
+    );
     require!(keywords.len() > 0, ErrorCode::InvalidKeyword);
     require!(price > 0, ErrorCode::InvalidPrice);
 
@@ -531,8 +534,12 @@ pub fn update_product(
     }
 
     // 更新关键词（现在在ProductBase中）
+    // 修改时允许最多10个关键词，创建时限制为3个（考虑指令账户大小）
     if let Some(new_keywords) = keywords {
-        require!(new_keywords.len() <= 3, ErrorCode::TooManyKeywords);
+        require!(
+            new_keywords.len() <= MAX_KEYWORDS_PER_PRODUCT,
+            ErrorCode::TooManyKeywords
+        );
         require!(new_keywords.len() > 0, ErrorCode::InvalidKeyword);
         product.update_keywords(new_keywords)?;
     }

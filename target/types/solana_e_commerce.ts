@@ -1761,6 +1761,9 @@ export type SolanaECommerce = {
           }
         },
         {
+          "name": "depositTokenMint"
+        },
+        {
           "name": "depositEscrowAccount",
           "writable": true,
           "pda": {
@@ -1783,6 +1786,10 @@ export type SolanaECommerce = {
                   111,
                   119
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "depositTokenMint"
               }
             ]
           }
@@ -2075,6 +2082,9 @@ export type SolanaECommerce = {
               }
             ]
           }
+        },
+        {
+          "name": "depositTokenMint"
         }
       ],
       "args": [],
@@ -2438,6 +2448,10 @@ export type SolanaECommerce = {
                   110,
                   116
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentTokenMint"
               }
             ]
           }
@@ -2836,6 +2850,10 @@ export type SolanaECommerce = {
                   111,
                   119
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "depositTokenMint"
               }
             ]
           }
@@ -2927,6 +2945,10 @@ export type SolanaECommerce = {
                   110,
                   116
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentTokenMint"
               }
             ]
           }
@@ -4198,8 +4220,9 @@ export type SolanaECommerce = {
         {
           "name": "merchantOwner",
           "docs": [
-            "商户所有者公钥（用于PDA计算和权限验证）"
-          ]
+            "商户所有者（签名者）"
+          ],
+          "signer": true
         },
         {
           "name": "systemConfig",
@@ -4231,6 +4254,9 @@ export type SolanaECommerce = {
           "writable": true
         },
         {
+          "name": "depositTokenMint"
+        },
+        {
           "name": "depositEscrowAccount",
           "writable": true,
           "pda": {
@@ -4253,6 +4279,10 @@ export type SolanaECommerce = {
                   111,
                   119
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "depositTokenMint"
               }
             ]
           }

@@ -43,7 +43,7 @@ pub struct ManageDeposit<'info> {
     #[account(
         init_if_needed,
         payer = merchant_owner,
-        seeds = [b"deposit_escrow"],
+        seeds = [b"deposit_escrow", deposit_token_mint.key().as_ref()],
         bump,
         token::mint = deposit_token_mint,
         token::authority = deposit_escrow_account,
@@ -110,21 +110,21 @@ pub fn manage_deposit(ctx: Context<ManageDeposit>, amount: u64) -> Result<()> {
         );
     }
 
-    // 检查是否满足最低保证金要求
-    let required_deposit = system_config.get_deposit_requirement();
-    if merchant.deposit_amount >= required_deposit {
-        msg!(
-            "商户保证金充足: {} >= {} (要求)",
-            merchant.deposit_amount,
-            required_deposit
-        );
-    } else {
-        msg!(
-            "商户保证金不足: {} < {} (要求)，建议继续补充",
-            merchant.deposit_amount,
-            required_deposit
-        );
-    }
+    // 强制验证是否满足最低保证金要求
+    // 获取Token精度
+    let token_decimals = ctx.accounts.deposit_token_mint.decimals;
+    let required_deposit = system_config.get_deposit_requirement(token_decimals);
+    require!(
+        merchant.deposit_amount >= required_deposit,
+        ErrorCode::MerchantDepositInsufficient
+    );
+
+    msg!(
+        "商户保证金验证通过: {} >= {} (要求), Token精度: {}",
+        merchant.deposit_amount,
+        required_deposit,
+        token_decimals
+    );
 
     Ok(())
 }
@@ -143,9 +143,8 @@ pub struct WithdrawMerchantDeposit<'info> {
     )]
     pub merchant: Account<'info, Merchant>,
 
-    /// 商户所有者公钥（用于PDA计算和权限验证）
-    /// CHECK: 这是商户的公钥，用于PDA计算
-    pub merchant_owner: UncheckedAccount<'info>,
+    /// 商户所有者（签名者）
+    pub merchant_owner: Signer<'info>,
 
     // 系统配置账户
     #[account(
@@ -161,10 +160,16 @@ pub struct WithdrawMerchantDeposit<'info> {
     )]
     pub recipient_token_account: Account<'info, TokenAccount>,
 
+    // 保证金Token mint账户（用于获取精度）
+    #[account(
+        constraint = deposit_token_mint.key() == system_config.deposit_token_mint @ ErrorCode::InvalidDepositToken
+    )]
+    pub deposit_token_mint: Account<'info, Mint>,
+
     // 系统保证金托管账户
     #[account(
         mut,
-        seeds = [b"deposit_escrow"],
+        seeds = [b"deposit_escrow", deposit_token_mint.key().as_ref()],
         bump,
         constraint = deposit_escrow_account.mint == system_config.deposit_token_mint @ ErrorCode::InvalidDepositToken
     )]
@@ -173,11 +178,11 @@ pub struct WithdrawMerchantDeposit<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-/// 商户提取保证金（支持商户和管理员双重权限）
+/// 商户提取保证金（仅限商户本人操作）
 pub fn withdraw_merchant_deposit(ctx: Context<WithdrawMerchantDeposit>, amount: u64) -> Result<()> {
     let merchant = &mut ctx.accounts.merchant;
     let system_config = &ctx.accounts.system_config;
-    let signer = &ctx.accounts.signer;
+    let merchant_owner = &ctx.accounts.merchant_owner;
 
     // 验证提取金额
     require!(amount > 0, ErrorCode::InvalidDepositAmount);
@@ -188,38 +193,29 @@ pub fn withdraw_merchant_deposit(ctx: Context<WithdrawMerchantDeposit>, amount: 
         ErrorCode::InsufficientDeposit
     );
 
-    // 权限验证：商户本人或系统管理员
-    let is_merchant_owner = merchant.owner == signer.key();
-    let is_system_admin = system_config.authority == signer.key(); // 假设系统配置有authority字段
-
+    // 权限验证：仅限商户本人
     require!(
-        is_merchant_owner || is_system_admin,
+        merchant.owner == merchant_owner.key(),
         ErrorCode::Unauthorized
     );
 
-    // 如果是商户提取，需要检查最低保证金限制
-    // 如果是管理员提取，可以提取任意金额（用于违规处罚等）
-    if is_merchant_owner {
-        let remaining_deposit = merchant.get_available_deposit().saturating_sub(amount);
-        require!(
-            remaining_deposit >= system_config.get_deposit_requirement(),
-            ErrorCode::MerchantDepositInsufficient
-        );
+    // 检查提取后是否满足最低保证金限制
+    let remaining_deposit = merchant.get_available_deposit().saturating_sub(amount);
+    // 获取Token精度
+    let token_decimals = ctx.accounts.deposit_token_mint.decimals;
+    let required_deposit = system_config.get_deposit_requirement(token_decimals);
+    require!(
+        remaining_deposit >= required_deposit,
+        ErrorCode::MerchantDepositInsufficient
+    );
 
-        msg!(
-            "商户 {} 提取保证金，提取后剩余: {} tokens，最低要求: {} tokens",
-            merchant.owner,
-            remaining_deposit,
-            system_config.get_deposit_requirement()
-        );
-    } else {
-        msg!(
-            "管理员 {} 提取商户 {} 的保证金 {} tokens（管理操作）",
-            signer.key(),
-            merchant.owner,
-            amount
-        );
-    }
+    msg!(
+        "商户 {} 提取保证金，提取后剩余: {} tokens，最低要求: {} tokens，Token精度: {}",
+        merchant.owner,
+        remaining_deposit,
+        required_deposit,
+        token_decimals
+    );
 
     // 验证托管账户余额
     require!(
@@ -229,7 +225,12 @@ pub fn withdraw_merchant_deposit(ctx: Context<WithdrawMerchantDeposit>, amount: 
 
     // 执行代币转账从系统托管账户到接收账户
     let deposit_escrow_bump = ctx.bumps.deposit_escrow_account;
-    let seeds = &[b"deposit_escrow".as_ref(), &[deposit_escrow_bump]];
+    let token_mint_key = ctx.accounts.deposit_token_mint.key();
+    let seeds = &[
+        b"deposit_escrow".as_ref(),
+        token_mint_key.as_ref(),
+        &[deposit_escrow_bump],
+    ];
     let signer_seeds = &[&seeds[..]];
 
     let cpi_accounts = Transfer {
@@ -250,7 +251,7 @@ pub fn withdraw_merchant_deposit(ctx: Context<WithdrawMerchantDeposit>, amount: 
         merchant.owner,
         amount,
         merchant.deposit_amount,
-        signer.key()
+        merchant_owner.key()
     );
 
     Ok(())
@@ -274,6 +275,12 @@ pub struct GetMerchantDepositInfo<'info> {
         bump
     )]
     pub system_config: Account<'info, SystemConfig>,
+
+    // 保证金Token mint账户（用于获取精度）
+    #[account(
+        constraint = deposit_token_mint.key() == system_config.deposit_token_mint @ ErrorCode::InvalidDepositToken
+    )]
+    pub deposit_token_mint: Account<'info, Mint>,
 }
 
 /// 查询商户保证金信息
@@ -282,13 +289,15 @@ pub fn get_merchant_deposit_info(
 ) -> Result<MerchantDepositInfo> {
     let merchant = &ctx.accounts.merchant;
     let system_config = &ctx.accounts.system_config;
+    let token_decimals = ctx.accounts.deposit_token_mint.decimals;
+    let required_deposit = system_config.get_deposit_requirement(token_decimals);
 
     Ok(MerchantDepositInfo {
         total_deposit: merchant.deposit_amount,
         locked_deposit: merchant.deposit_locked,
         available_deposit: merchant.get_available_deposit(),
-        required_deposit: system_config.get_deposit_requirement(),
-        is_sufficient: merchant.has_sufficient_deposit(system_config.get_deposit_requirement()),
+        required_deposit,
+        is_sufficient: merchant.deposit_amount >= required_deposit,
         deposit_token_mint: merchant.deposit_token_mint,
         last_updated: merchant.deposit_updated_at,
     })
@@ -368,10 +377,16 @@ pub struct DeductMerchantDeposit<'info> {
     )]
     pub system_config: Account<'info, SystemConfig>,
 
+    // 保证金Token mint账户（用于获取精度）
+    #[account(
+        constraint = deposit_token_mint.key() == system_config.deposit_token_mint @ ErrorCode::InvalidDepositToken
+    )]
+    pub deposit_token_mint: Account<'info, Mint>,
+
     // 系统保证金托管账户
     #[account(
         mut,
-        seeds = [b"deposit_escrow"],
+        seeds = [b"deposit_escrow", deposit_token_mint.key().as_ref()],
         bump,
         constraint = deposit_escrow_account.mint == system_config.deposit_token_mint @ ErrorCode::InvalidDepositToken
     )]
@@ -440,12 +455,14 @@ pub fn deduct_merchant_deposit(
     );
 
     // 检查保证金是否低于要求
-    let required_deposit = system_config.get_deposit_requirement();
+    let token_decimals = ctx.accounts.deposit_token_mint.decimals;
+    let required_deposit = system_config.get_deposit_requirement(token_decimals);
     if merchant.deposit_amount < required_deposit {
         msg!(
-            "警告：商户保证金不足，当前: {} < 要求: {}",
+            "警告：商户保证金不足，当前: {} < 要求: {}，Token精度: {}",
             merchant.deposit_amount,
-            required_deposit
+            required_deposit,
+            token_decimals
         );
     }
 

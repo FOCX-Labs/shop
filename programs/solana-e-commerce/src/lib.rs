@@ -508,7 +508,21 @@ impl Default for SystemConfig {
 
 impl SystemConfig {
     /// 获取保证金要求（以代币最小单位计算）
-    pub fn get_deposit_requirement(&self) -> u64 {
+    ///
+    /// # 参数
+    /// - `token_decimals`: Token的精度（从mint账户获取）
+    ///
+    /// # 返回
+    /// 根据Token精度计算的实际保证金要求
+    pub fn get_deposit_requirement(&self, token_decimals: u8) -> u64 {
+        // merchant_deposit_required 存储的是基础单位（如1000）
+        // 需要根据Token精度转换为最小单位
+        self.merchant_deposit_required
+            .saturating_mul(10_u64.saturating_pow(token_decimals as u32))
+    }
+
+    /// 获取基础保证金要求（不考虑精度）
+    pub fn get_base_deposit_requirement(&self) -> u64 {
         self.merchant_deposit_required
     }
 

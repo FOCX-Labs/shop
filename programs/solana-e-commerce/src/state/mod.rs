@@ -20,7 +20,8 @@ pub use user_purchase_count::*;
 
 // 系统常量
 pub const MAX_PRODUCTS_PER_SHARD: usize = 100;
-pub const MAX_KEYWORDS_PER_PRODUCT: usize = 10;
+pub const MAX_KEYWORDS_PER_PRODUCT: usize = 10; // 修改时的最大关键词数量
+pub const MAX_KEYWORDS_PER_PRODUCT_CREATE: usize = 3; // 创建时的最大关键词数量（考虑指令账户大小）
 pub const MAX_KEYWORD_LENGTH: usize = 32;
 pub const MAX_PRODUCT_NAME_LENGTH: usize = 100;
 pub const MAX_PRODUCT_DESCRIPTION_LENGTH: usize = 500;

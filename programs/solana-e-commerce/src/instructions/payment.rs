@@ -131,14 +131,15 @@ pub struct PurchaseProductEscrow<'info> {
     )]
     pub product: Account<'info, ProductBase>,
 
-    // 主程序统一托管代币账户
+    // 主程序统一托管代币账户（使用产品指定的支付代币）
     #[account(
         init_if_needed,
         payer = buyer,
         token::mint = payment_token_mint,
         token::authority = program_authority,
-        seeds = [b"program_token_account"],
-        bump
+        seeds = [b"program_token_account", payment_token_mint.key().as_ref()],
+        bump,
+        constraint = payment_token_mint.key() == product.payment_token @ ErrorCode::UnsupportedToken
     )]
     pub program_token_account: Account<'info, TokenAccount>,
 
@@ -214,7 +215,7 @@ pub struct InitializeProgramTokenAccount<'info> {
         payer = authority,
         token::mint = payment_token_mint,
         token::authority = program_authority,
-        seeds = [b"program_token_account"],
+        seeds = [b"program_token_account", payment_token_mint.key().as_ref()],
         bump
     )]
     pub program_token_account: Account<'info, TokenAccount>,
