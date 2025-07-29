@@ -6,7 +6,7 @@ pub mod state;
 pub mod utils;
 
 use instructions::*;
-use state::{OrderManagementStatus, SupportedToken};
+use state::SupportedToken;
 
 declare_id!("5XZ74thixMBX2tQN9P3yLTugUK4YMdRLznDNa2mRdGNT");
 
@@ -401,12 +401,8 @@ pub mod solana_e_commerce {
         )
     }
 
-    pub fn update_order_status(
-        ctx: Context<UpdateOrderStatus>,
-        new_status: OrderManagementStatus,
-        tracking_number: Option<String>,
-    ) -> Result<()> {
-        instructions::order::update_order_status(ctx, new_status, tracking_number)
+    pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()> {
+        instructions::order::ship_order(ctx, tracking_number)
     }
 
     // 买家请求退款

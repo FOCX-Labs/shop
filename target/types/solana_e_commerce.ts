@@ -3443,6 +3443,89 @@ export type SolanaECommerce = {
       ]
     },
     {
+      "name": "shipOrder",
+      "discriminator": [
+        2,
+        191,
+        151,
+        45,
+        16,
+        248,
+        97,
+        142
+      ],
+      "accounts": [
+        {
+          "name": "order",
+          "writable": true
+        },
+        {
+          "name": "orderStats",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  115,
+                  116,
+                  97,
+                  116,
+                  115
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "trackingNumber",
+          "type": "string"
+        }
+      ]
+    },
+    {
       "name": "splitPriceNode",
       "discriminator": [
         234,
@@ -3673,99 +3756,6 @@ export type SolanaECommerce = {
         },
         {
           "name": "description",
-          "type": {
-            "option": "string"
-          }
-        }
-      ]
-    },
-    {
-      "name": "updateOrderStatus",
-      "discriminator": [
-        88,
-        95,
-        133,
-        241,
-        63,
-        159,
-        32,
-        71
-      ],
-      "accounts": [
-        {
-          "name": "order",
-          "writable": true
-        },
-        {
-          "name": "orderStats",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114,
-                  95,
-                  115,
-                  116,
-                  97,
-                  116,
-                  115
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "merchant",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  101,
-                  114,
-                  99,
-                  104,
-                  97,
-                  110,
-                  116,
-                  95,
-                  105,
-                  110,
-                  102,
-                  111
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "merchant.owner",
-                "account": "merchant"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "signer": true
-        }
-      ],
-      "args": [
-        {
-          "name": "newStatus",
-          "type": {
-            "defined": {
-              "name": "orderManagementStatus"
-            }
-          }
-        },
-        {
-          "name": "trackingNumber",
           "type": {
             "option": "string"
           }
@@ -4508,148 +4498,488 @@ export type SolanaECommerce = {
   "errors": [
     {
       "code": 6000,
-      "name": "emptyProductName",
-      "msg": "Product name cannot be empty"
+      "name": "missingKeywordAccount",
+      "msg": ""
     },
     {
       "code": 6001,
-      "name": "productNameTooLong",
-      "msg": "Product name too long"
+      "name": "tooManyKeywords",
+      "msg": ""
     },
     {
       "code": 6002,
-      "name": "invalidProductName",
-      "msg": "Invalid product name"
+      "name": "shardFull",
+      "msg": ""
     },
     {
       "code": 6003,
-      "name": "descriptionTooLong",
-      "msg": "Description too long"
+      "name": "idGenerationFailed",
+      "msg": "id"
     },
     {
       "code": 6004,
-      "name": "invalidPrice",
-      "msg": "Invalid price"
+      "name": "rentCalculationFailed",
+      "msg": ""
     },
     {
       "code": 6005,
-      "name": "priceTooHigh",
-      "msg": "Price too high"
+      "name": "merchantNotRegistered",
+      "msg": ""
     },
     {
       "code": 6006,
-      "name": "emptyKeyword",
-      "msg": "Keyword cannot be empty"
+      "name": "idAlreadyInUse",
+      "msg": "id"
     },
     {
       "code": 6007,
-      "name": "keywordTooLong",
-      "msg": "Keyword too long"
+      "name": "idNotFound",
+      "msg": "id"
     },
     {
       "code": 6008,
-      "name": "invalidKeyword",
-      "msg": "Invalid keyword"
+      "name": "idRangeOverflow",
+      "msg": "id"
     },
     {
       "code": 6009,
-      "name": "keywordContainsSpace",
-      "msg": "Keyword cannot contain spaces"
+      "name": "noAvailableId",
+      "msg": "id"
     },
     {
       "code": 6010,
-      "name": "noKeywords",
-      "msg": "No keywords provided"
+      "name": "invalidId",
+      "msg": "id"
     },
     {
       "code": 6011,
-      "name": "tooManyKeywords",
-      "msg": "Too many keywords"
+      "name": "integerOverflow",
+      "msg": ""
     },
     {
       "code": 6012,
-      "name": "duplicateKeyword",
-      "msg": "Duplicate keyword"
+      "name": "productNotFound",
+      "msg": ""
     },
     {
       "code": 6013,
-      "name": "emptyMerchantName",
-      "msg": "Merchant name cannot be empty"
+      "name": "invalidProduct",
+      "msg": ""
     },
     {
       "code": 6014,
-      "name": "merchantNameTooLong",
-      "msg": "Merchant name too long"
+      "name": "invalidProductAccount",
+      "msg": ""
     },
     {
       "code": 6015,
-      "name": "invalidMerchantName",
-      "msg": "Invalid merchant name"
+      "name": "invalidPrice",
+      "msg": ""
     },
     {
       "code": 6016,
-      "name": "emptyEmail",
-      "msg": "Email cannot be empty"
+      "name": "invalidAmount",
+      "msg": "0"
     },
     {
       "code": 6017,
-      "name": "emailTooLong",
-      "msg": "Email too long"
+      "name": "invalidProductName",
+      "msg": ""
     },
     {
       "code": 6018,
-      "name": "invalidEmailFormat",
-      "msg": "Invalid email format"
+      "name": "invalidProductNameLength",
+      "msg": ""
     },
     {
       "code": 6019,
-      "name": "urlTooLong",
-      "msg": "URL too long"
+      "name": "invalidProductDescription",
+      "msg": ""
     },
     {
       "code": 6020,
-      "name": "invalidUrlFormat",
-      "msg": "Invalid URL format"
+      "name": "invalidProductDescriptionLength",
+      "msg": ""
     },
     {
       "code": 6021,
-      "name": "stockTooHigh",
-      "msg": "Stock too high"
+      "name": "tooManyImageUrls",
+      "msg": "url"
     },
     {
       "code": 6022,
-      "name": "salesTooHigh",
-      "msg": "Sales count too high"
+      "name": "tooManySalesRegions",
+      "msg": ""
     },
     {
       "code": 6023,
-      "name": "invalidRating",
-      "msg": "Invalid rating"
+      "name": "tooManyLogisticsMethods",
+      "msg": ""
     },
     {
       "code": 6024,
-      "name": "invalidShardId",
-      "msg": "Invalid shard ID"
+      "name": "invalidMerchant",
+      "msg": ""
     },
     {
       "code": 6025,
-      "name": "invalidProductId",
-      "msg": "Invalid product ID"
+      "name": "invalidMerchantNameLength",
+      "msg": ""
     },
     {
       "code": 6026,
-      "name": "invalidMerchantId",
-      "msg": "Invalid merchant ID"
+      "name": "invalidMerchantDescriptionLength",
+      "msg": ""
     },
     {
       "code": 6027,
-      "name": "invalidPriceRange",
-      "msg": "Invalid price range"
+      "name": "unauthorizedMerchant",
+      "msg": ""
     },
     {
       "code": 6028,
+      "name": "invalidKeyword",
+      "msg": ""
+    },
+    {
+      "code": 6029,
+      "name": "invalidKeywordLength",
+      "msg": ""
+    },
+    {
+      "code": 6030,
+      "name": "invalidKeywordCount",
+      "msg": ""
+    },
+    {
+      "code": 6031,
+      "name": "duplicateKeyword",
+      "msg": ""
+    },
+    {
+      "code": 6032,
+      "name": "shardIsFull",
+      "msg": ""
+    },
+    {
+      "code": 6033,
+      "name": "invalidShardIndex",
+      "msg": ""
+    },
+    {
+      "code": 6034,
+      "name": "priceIndexNodeNotFound",
+      "msg": ""
+    },
+    {
+      "code": 6035,
+      "name": "salesIndexNodeNotFound",
+      "msg": ""
+    },
+    {
+      "code": 6036,
+      "name": "invalidPriceRange",
+      "msg": ""
+    },
+    {
+      "code": 6037,
       "name": "invalidSalesRange",
-      "msg": "Invalid sales range"
+      "msg": ""
+    },
+    {
+      "code": 6038,
+      "name": "bloomFilterUpdateFailed",
+      "msg": ""
+    },
+    {
+      "code": 6039,
+      "name": "keywordIndexNotEmpty",
+      "msg": ""
+    },
+    {
+      "code": 6040,
+      "name": "keywordShardNotEmpty",
+      "msg": ""
+    },
+    {
+      "code": 6041,
+      "name": "merchantHasActiveProducts",
+      "msg": ""
+    },
+    {
+      "code": 6042,
+      "name": "idChunkNotEmpty",
+      "msg": "id"
+    },
+    {
+      "code": 6043,
+      "name": "merchantIdAccountNotEmpty",
+      "msg": "id"
+    },
+    {
+      "code": 6044,
+      "name": "unsupportedToken",
+      "msg": ""
+    },
+    {
+      "code": 6045,
+      "name": "insufficientTokenBalance",
+      "msg": ""
+    },
+    {
+      "code": 6046,
+      "name": "insufficientSolBalance",
+      "msg": "sol"
+    },
+    {
+      "code": 6047,
+      "name": "invalidTokenAmount",
+      "msg": ""
+    },
+    {
+      "code": 6048,
+      "name": "tokenTransferFailed",
+      "msg": ""
+    },
+    {
+      "code": 6049,
+      "name": "feeCalculationError",
+      "msg": ""
+    },
+    {
+      "code": 6050,
+      "name": "paymentConfigNotFound",
+      "msg": ""
+    },
+    {
+      "code": 6051,
+      "name": "tokenNotActive",
+      "msg": ""
+    },
+    {
+      "code": 6052,
+      "name": "belowMinimumAmount",
+      "msg": ""
+    },
+    {
+      "code": 6053,
+      "name": "productCreationFailed",
+      "msg": ""
+    },
+    {
+      "code": 6054,
+      "name": "atomicOperationFailed",
+      "msg": ""
+    },
+    {
+      "code": 6055,
+      "name": "invalidFeeRate",
+      "msg": ""
+    },
+    {
+      "code": 6056,
+      "name": "tooManyTokens",
+      "msg": ""
+    },
+    {
+      "code": 6057,
+      "name": "invalidTokenSymbol",
+      "msg": ""
+    },
+    {
+      "code": 6058,
+      "name": "invalidTokenDecimals",
+      "msg": ""
+    },
+    {
+      "code": 6059,
+      "name": "invalidOrderStatus",
+      "msg": ""
+    },
+    {
+      "code": 6060,
+      "name": "invalidPaymentMethod",
+      "msg": ""
+    },
+    {
+      "code": 6061,
+      "name": "orderNotFound",
+      "msg": ""
+    },
+    {
+      "code": 6062,
+      "name": "invalidOrderQuantity",
+      "msg": ""
+    },
+    {
+      "code": 6063,
+      "name": "invalidOrderPrice",
+      "msg": ""
+    },
+    {
+      "code": 6064,
+      "name": "invalidOrderTotalAmount",
+      "msg": ""
+    },
+    {
+      "code": 6065,
+      "name": "invalidOrderTokenPrice",
+      "msg": ""
+    },
+    {
+      "code": 6066,
+      "name": "invalidOrderTokenTotalAmount",
+      "msg": ""
+    },
+    {
+      "code": 6067,
+      "name": "invalidShippingAddressLength",
+      "msg": ""
+    },
+    {
+      "code": 6068,
+      "name": "invalidOrderNotesLength",
+      "msg": ""
+    },
+    {
+      "code": 6069,
+      "name": "invalidTransactionSignature",
+      "msg": ""
+    },
+    {
+      "code": 6070,
+      "name": "invalidOrderStatusTransition",
+      "msg": ""
+    },
+    {
+      "code": 6071,
+      "name": "orderCannotBeModified",
+      "msg": ""
+    },
+    {
+      "code": 6072,
+      "name": "orderCannotBeRefunded",
+      "msg": ""
+    },
+    {
+      "code": 6073,
+      "name": "orderAlreadyExists",
+      "msg": ""
+    },
+    {
+      "code": 6074,
+      "name": "unauthorized",
+      "msg": ""
+    },
+    {
+      "code": 6075,
+      "name": "invalidTimestamp",
+      "msg": ""
+    },
+    {
+      "code": 6076,
+      "name": "invalidAccountOwner",
+      "msg": ""
+    },
+    {
+      "code": 6077,
+      "name": "invalidAccountData",
+      "msg": ""
+    },
+    {
+      "code": 6078,
+      "name": "invalidAccountSize",
+      "msg": ""
+    },
+    {
+      "code": 6079,
+      "name": "invalidPda",
+      "msg": "pda"
+    },
+    {
+      "code": 6080,
+      "name": "invalidAccountSeeds",
+      "msg": ""
+    },
+    {
+      "code": 6081,
+      "name": "invalidAccountBump",
+      "msg": "bump"
+    },
+    {
+      "code": 6082,
+      "name": "insufficientFunds",
+      "msg": ""
+    },
+    {
+      "code": 6083,
+      "name": "invalidActiveChunk",
+      "msg": ""
+    },
+    {
+      "code": 6084,
+      "name": "accountDiscriminatorMismatch",
+      "msg": ""
+    },
+    {
+      "code": 6085,
+      "name": "insufficientAccounts",
+      "msg": ""
+    },
+    {
+      "code": 6086,
+      "name": "insufficientDeposit",
+      "msg": ""
+    },
+    {
+      "code": 6087,
+      "name": "insufficientLockedDeposit",
+      "msg": ""
+    },
+    {
+      "code": 6088,
+      "name": "invalidDepositToken",
+      "msg": ""
+    },
+    {
+      "code": 6089,
+      "name": "invalidDepositAmount",
+      "msg": ""
+    },
+    {
+      "code": 6090,
+      "name": "merchantDepositInsufficient",
+      "msg": "商户保证金不足，无法进行交易"
+    },
+    {
+      "code": 6091,
+      "name": "depositAlreadyLocked",
+      "msg": ""
+    },
+    {
+      "code": 6092,
+      "name": "depositNotLocked",
+      "msg": ""
+    },
+    {
+      "code": 6093,
+      "name": "arithmeticOverflow",
+      "msg": ""
+    },
+    {
+      "code": 6094,
+      "name": "arithmeticUnderflow",
+      "msg": ""
+    },
+    {
+      "code": 6095,
+      "name": "trackingNumberRequired",
+      "msg": ""
+    },
+    {
+      "code": 6096,
+      "name": "invalidTrackingNumber",
+      "msg": ""
     }
   ],
   "types": [

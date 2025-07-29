@@ -59,9 +59,9 @@ pub struct CreateOrder<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// 更新订单状态
+// 商户发货
 #[derive(Accounts)]
-pub struct UpdateOrderStatus<'info> {
+pub struct ShipOrder<'info> {
     #[account(mut)]
     pub order: Account<'info, Order>,
 
@@ -302,11 +302,7 @@ pub fn create_order(
     Ok(())
 }
 
-pub fn update_order_status(
-    ctx: Context<UpdateOrderStatus>,
-    new_status: OrderManagementStatus,
-    tracking_number: Option<String>,
-) -> Result<()> {
+pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()> {
     let order = &mut ctx.accounts.order;
     let order_stats = &mut ctx.accounts.order_stats;
     let merchant = &ctx.accounts.merchant;
@@ -314,34 +310,29 @@ pub fn update_order_status(
     // 验证订单属于该商户
     require!(order.merchant == merchant.owner, ErrorCode::InvalidMerchant);
 
+    // 验证物流单号
+    require!(
+        !tracking_number.is_empty() && tracking_number.len() <= 100,
+        ErrorCode::InvalidTrackingNumber
+    );
+
     let old_status = order.status.clone();
     let current_time = Clock::get()?.unix_timestamp;
 
-    // 如果状态变为Shipped，必须提供物流单号
-    if new_status == OrderManagementStatus::Shipped {
-        let tracking_num = tracking_number.ok_or(ErrorCode::TrackingNumberRequired)?;
-        require!(
-            !tracking_num.is_empty() && tracking_num.len() <= 100,
-            ErrorCode::InvalidTrackingNumber
-        );
-        order.tracking_number = tracking_num;
-    }
+    // 设置物流单号
+    order.tracking_number = tracking_number.clone();
 
-    // 更新订单状态
-    order.update_status(new_status.clone(), current_time)?;
+    // 更新订单状态为已发货
+    order.update_status(OrderManagementStatus::Shipped, current_time)?;
 
     // 更新统计信息
-    order_stats.update_for_status_change(&old_status, &new_status, order.total_amount);
-
-    msg!(
-        "订单状态更新成功: 从 {:?} 更新为 {:?}",
-        old_status,
-        new_status
+    order_stats.update_for_status_change(
+        &old_status,
+        &OrderManagementStatus::Shipped,
+        order.total_amount,
     );
 
-    if new_status == OrderManagementStatus::Shipped {
-        msg!("物流单号: {}", order.tracking_number);
-    }
+    msg!("商户发货成功: 物流单号: {}", tracking_number);
 
     Ok(())
 }
