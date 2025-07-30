@@ -215,4 +215,12 @@ pub enum ErrorCode {
     TrackingNumberRequired,
     #[msg("Invalid tracking number")]
     InvalidTrackingNumber,
+
+    // Vault related errors
+    #[msg("Invalid vault program")]
+    InvalidVaultProgram,
+    #[msg("Invalid vault token account")]
+    InvalidVaultTokenAccount,
+    #[msg("Invalid platform token account")]
+    InvalidPlatformTokenAccount,
 }

@@ -75,6 +75,8 @@ pub fn initialize_system_config(
     system_config.platform_fee_recipient = config.platform_fee_recipient;
     system_config.auto_confirm_days = config.auto_confirm_days;
     system_config.vault_program_id = config.vault_program_id;
+    system_config.vault_token_account = config.vault_token_account;
+    system_config.platform_token_account = config.platform_token_account;
 
     msg!(
         "系统配置初始化成功，管理员: {}, 保证金要求: {} tokens",

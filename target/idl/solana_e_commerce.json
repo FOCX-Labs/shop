@@ -1130,6 +1130,18 @@
           }
         },
         {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "vault_token_account",
+          "writable": true
+        },
+        {
+          "name": "platform_token_account",
+          "writable": true
+        },
+        {
           "name": "buyer",
           "signer": true
         },
@@ -1242,112 +1254,6 @@
         {
           "name": "shard_index",
           "type": "u32"
-        }
-      ]
-    },
-    {
-      "name": "create_merchant_order",
-      "discriminator": [
-        90,
-        106,
-        124,
-        68,
-        78,
-        247,
-        200,
-        193
-      ],
-      "accounts": [
-        {
-          "name": "merchant_order_count",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  101,
-                  114,
-                  99,
-                  104,
-                  97,
-                  110,
-                  116,
-                  95,
-                  111,
-                  114,
-                  100,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "merchant.owner",
-                "account": "Merchant"
-              }
-            ]
-          }
-        },
-        {
-          "name": "merchant_order",
-          "writable": true
-        },
-        {
-          "name": "merchant",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  101,
-                  114,
-                  99,
-                  104,
-                  97,
-                  110,
-                  116,
-                  95,
-                  105,
-                  110,
-                  102,
-                  111
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "merchant.owner",
-                "account": "Merchant"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "buyer_order_pda",
-          "type": "pubkey"
-        },
-        {
-          "name": "product_id",
-          "type": "u64"
         }
       ]
     },
@@ -1480,6 +1386,48 @@
               }
             ]
           }
+        },
+        {
+          "name": "merchant_order_count",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_order",
+          "writable": true
         },
         {
           "name": "buyer",
@@ -5126,6 +5074,21 @@
       "code": 6096,
       "name": "InvalidTrackingNumber",
       "msg": "Invalid tracking number"
+    },
+    {
+      "code": 6097,
+      "name": "InvalidVaultProgram",
+      "msg": "Invalid vault program"
+    },
+    {
+      "code": 6098,
+      "name": "InvalidVaultTokenAccount",
+      "msg": "Invalid vault token account"
+    },
+    {
+      "code": 6099,
+      "name": "InvalidPlatformTokenAccount",
+      "msg": "Invalid platform token account"
     }
   ],
   "types": [
@@ -6125,6 +6088,14 @@
           },
           {
             "name": "vault_program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_token_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "platform_token_account",
             "type": "pubkey"
           }
         ]

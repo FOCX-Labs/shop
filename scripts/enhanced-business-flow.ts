@@ -18,6 +18,7 @@ import {
   mintTo,
   TOKEN_PROGRAM_ID,
   createInitializeAccountInstruction,
+  getMint,
 } from "@solana/spl-token";
 
 /**
@@ -44,7 +45,7 @@ export class EnhancedBusinessFlowExecutor {
 
   // Business configuration
   private readonly BUSINESS_CONFIG = {
-    MERCHANT_DEPOSIT_REQUIRED: 1000 * Math.pow(10, 9), // 1000 tokens
+    MERCHANT_DEPOSIT_REQUIRED_BASE: 1000, // 1000 tokens (基础金额，会根据Token精度动态计算)
     PRODUCTS: [
       {
         name: "iPhone 15 Pro",
@@ -107,6 +108,26 @@ export class EnhancedBusinessFlowExecutor {
    */
   private formatTokenAmount(amount: number): string {
     return `${amount} ${this.tokenSymbol}`;
+  }
+
+  /**
+   * 动态获取Token精度
+   */
+  private async getTokenDecimals(tokenMint: PublicKey): Promise<number> {
+    try {
+      const mintInfo = await getMint(this.connection, tokenMint);
+      return mintInfo.decimals;
+    } catch (error) {
+      console.error(`❌ 获取Token精度失败: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * 根据Token精度计算金额
+   */
+  private calculateTokenAmount(baseAmount: number, decimals: number): number {
+    return baseAmount * Math.pow(10, decimals);
   }
 
   /**
@@ -247,7 +268,7 @@ export class EnhancedBusinessFlowExecutor {
           const decimals = mintData[44]; // Mint账户中decimals字段的位置
           console.log(`   📊 Token精度: ${decimals}位`);
 
-          const mintAmount = 10000000 * Math.pow(10, decimals); // 铸造10,000,000个Token
+          const mintAmount = this.calculateTokenAmount(10000000, decimals); // 铸造10,000,000个Token
 
           try {
             await mintTo(
@@ -443,7 +464,8 @@ export class EnhancedBusinessFlowExecutor {
       );
 
       // 铸造1,000,000个Token作为初始供应量
-      const initialSupply = 1000000 * Math.pow(10, 9); // 1M tokens
+      const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+      const initialSupply = this.calculateTokenAmount(1000000, tokenDecimals); // 1M tokens
       await mintTo(
         this.connection,
         this.authority,
@@ -545,6 +567,10 @@ export class EnhancedBusinessFlowExecutor {
 
       // Vault程序ID - 用于CPI调用add_rewards指令的vault程序地址
       vaultProgramId: new PublicKey("EHiKn3J5wywNG2rHV2Qt74AfNqtJajhPerkVzYXudEwn"), // Vault程序ID
+
+      // Vault相关账户配置
+      vaultTokenAccount: new PublicKey("GSzHB4ZRdA26yZRXRnSvTx41YJFQnBivifaNn6XKHQy1"), // Vault Token账户
+      platformTokenAccount: new PublicKey("11111111111111111111111111111112"), // 平台Token账户 (临时地址)
     };
 
     // 调用 initialize_system 指令
@@ -630,6 +656,10 @@ export class EnhancedBusinessFlowExecutor {
 
       // Vault程序ID - 用于CPI调用add_rewards指令的vault程序地址
       vaultProgramId: new PublicKey("EHiKn3J5wywNG2rHV2Qt74AfNqtJajhPerkVzYXudEwn"), // Vault程序ID
+
+      // Vault相关账户配置
+      vaultTokenAccount: new PublicKey("GSzHB4ZRdA26yZRXRnSvTx41YJFQnBivifaNn6XKHQy1"), // Vault Token账户
+      platformTokenAccount: new PublicKey("11111111111111111111111111111112"), // 平台Token账户 (临时地址)
     };
 
     // 调用 initialize_system_config 指令
@@ -920,7 +950,9 @@ export class EnhancedBusinessFlowExecutor {
         this.authority.publicKey
       );
 
-      const transferTokenAmount = 2000 * Math.pow(10, 9); // 2000 tokens
+      // 动态获取Token精度并计算转移金额
+      const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+      const transferTokenAmount = this.calculateTokenAmount(2000, tokenDecimals); // 2000 tokens
       const tokenTransferSignature = await transfer(
         this.connection,
         this.authority,
@@ -970,8 +1002,8 @@ export class EnhancedBusinessFlowExecutor {
         } as any)
         .instruction();
 
-      // 指令2：缴纳保证金
-      const depositAmount = new anchor.BN(2000 * Math.pow(10, 9)); // 2000 tokens
+      // 指令2：缴纳保证金 (使用动态Token精度)
+      const depositAmount = new anchor.BN(this.calculateTokenAmount(2000, tokenDecimals)); // 2000 tokens
       const manageDepositIx = await this.program.methods
         .manageDeposit(depositAmount)
         .accounts({
@@ -1040,8 +1072,9 @@ export class EnhancedBusinessFlowExecutor {
       const [systemConfigPDA] = this.calculatePDA(["system_config"]);
       const [depositEscrowPDA] = this.calculatePDA(["deposit_escrow", this.tokenMint!.toBuffer()]);
 
-      // 提取1000 Token作为演示
-      const withdrawAmount = new anchor.BN(1000 * Math.pow(10, 9));
+      // 提取1000 Token作为演示 (使用动态Token精度)
+      const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+      const withdrawAmount = new anchor.BN(this.calculateTokenAmount(1000, tokenDecimals));
 
       console.log(`   📊 提取保证金金额: ${this.formatTokenAmount(1000)}`);
       console.log(`   🏪 商户账户: ${this.merchantKeypair.publicKey.toString()}`);
@@ -1451,8 +1484,9 @@ export class EnhancedBusinessFlowExecutor {
       const productIdBytes = new anchor.BN(nextProductId).toArray("le", 8);
       const [productAccountPDA] = this.calculatePDA(["product", Buffer.from(productIdBytes)]);
 
-      // 创建产品 - 使用Token价格
-      const priceInTokens = Math.floor(product.price * Math.pow(10, 9)); // 转换为最小单位
+      // 创建产品 - 使用Token价格 (动态精度)
+      const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+      const priceInTokens = Math.floor(this.calculateTokenAmount(product.price, tokenDecimals)); // 转换为最小单位
 
       console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
       console.log(`   💰 产品价格: ${this.formatTokenAmount(product.price)}`);
@@ -2291,7 +2325,8 @@ export class EnhancedBusinessFlowExecutor {
       const productIdBytes = new anchor.BN(productId).toArray("le", 8);
       const [productAccountPDA] = this.calculatePDA(["product", Buffer.from(productIdBytes)]);
 
-      const newPriceInTokens = Math.floor(newPrice * Math.pow(10, 9));
+      const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+      const newPriceInTokens = Math.floor(this.calculateTokenAmount(newPrice, tokenDecimals));
 
       console.log(`   💰 更新产品价格: ${this.formatTokenAmount(newPrice)}`);
       console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
@@ -2489,7 +2524,7 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   🏪 商户订单PDA: ${merchantOrderPDA.toString()}`);
       console.log(`   📊 商户订单序列号: ${merchantOrderCount + 1}`);
 
-      // 1. 创建买家订单指令
+      // 1. 创建订单指令（同时创建买家订单和商户订单）
       const createOrderInstruction = await this.program.methods
         .createOrder(
           new anchor.BN(productId),
@@ -2501,6 +2536,8 @@ export class EnhancedBusinessFlowExecutor {
         .accounts({
           userPurchaseCount: userPurchaseCountPDA,
           order: orderPDA,
+          merchantOrderCount: merchantOrderCountPDA,
+          merchantOrder: merchantOrderPDA,
           orderStats: orderStatsPDA,
           product: productAccount,
           merchant: merchantPDA,
@@ -2509,22 +2546,7 @@ export class EnhancedBusinessFlowExecutor {
         } as any)
         .instruction();
 
-      // 2. 创建商户订单指令（引用买家订单PDA）
-      const createMerchantOrderInstruction = await this.program.methods
-        .createMerchantOrder(
-          orderPDA, // buyer_order_pda
-          new anchor.BN(productId)
-        )
-        .accounts({
-          merchantOrderCount: merchantOrderCountPDA,
-          merchantOrder: merchantOrderPDA,
-          merchant: merchantPDA,
-          authority: buyerKeypair.publicKey, // 买家作为权限账户
-          systemProgram: SystemProgram.programId,
-        } as any)
-        .instruction();
-
-      // 3. 准备支付指令的账户
+      // 2. 准备支付指令的账户
       const [programTokenAccountPDA] = this.calculatePDA([
         "program_token_account",
         this.tokenMint!.toBuffer(),
@@ -2549,17 +2571,16 @@ export class EnhancedBusinessFlowExecutor {
         } as any)
         .instruction();
 
-      // 4. 将三个指令添加到同一个交易中（原子性）
+      // 3. 将两个指令添加到同一个交易中（原子性）
       transaction.add(createOrderInstruction);
-      transaction.add(createMerchantOrderInstruction);
       transaction.add(paymentInstruction);
 
       console.log(`   ⚡ 执行原子交易（包含 ${transaction.instructions.length} 个指令）...`);
       console.log(`   📦 买家订单PDA: ${orderPDA.toString()}`);
       console.log(`   🏪 商户订单PDA: ${merchantOrderPDA.toString()}`);
-      console.log(`   🔗 三指令原子执行: 1.创建买家订单 + 2.创建商户订单 + 3.Token支付`);
+      console.log(`   🔗 双指令原子执行: 1.创建双订单(买家+商户) + 2.Token支付`);
 
-      // 4. 执行原子交易
+      // 3. 执行原子交易
       const signature = await sendAndConfirmTransaction(
         this.connection,
         transaction,
@@ -2785,7 +2806,9 @@ export class EnhancedBusinessFlowExecutor {
         this.authority.publicKey
       );
 
-      const transferTokenAmount = 200 * Math.pow(10, 9); // 200 tokens (增加余额以应对多次购买调用)
+      // 动态获取Token精度并计算转移金额
+      const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+      const transferTokenAmount = this.calculateTokenAmount(200, tokenDecimals); // 200 tokens (增加余额以应对多次购买调用)
       const tokenTransferSignature = await transfer(
         this.connection,
         this.authority,
@@ -3003,8 +3026,17 @@ export class EnhancedBusinessFlowExecutor {
     }
 
     const productAccountPDA = this.createdProducts[productAccountIndex];
-    const productPrice = this.BUSINESS_CONFIG.PRODUCTS[productAccountIndex].price * Math.pow(10, 9); // 转换为lamports
-    console.log(`   💰 产品价格: ${this.formatTokenAmount(productPrice / Math.pow(10, 9))}`);
+    // 使用动态Token精度计算价格
+    const tokenDecimals = await this.getTokenDecimals(this.tokenMint!);
+    const productPrice = this.calculateTokenAmount(
+      this.BUSINESS_CONFIG.PRODUCTS[productAccountIndex].price,
+      tokenDecimals
+    ); // 转换为最小单位
+    console.log(
+      `   💰 产品价格: ${this.formatTokenAmount(
+        this.BUSINESS_CONFIG.PRODUCTS[productAccountIndex].price
+      )}`
+    );
 
     // 构建原子购买交易（使用原子交易方法）
     const atomicResult = await this.executeAtomicPurchase(
@@ -3019,7 +3051,9 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   ✅ 原子购买交易成功！交易签名: ${atomicResult.signature}`);
       console.log(`   🔒 订单账户: ${orderPDA.toString()}`);
       console.log(
-        `   💰 ${this.formatTokenAmount(productPrice / Math.pow(10, 9))} TOKEN 已转入程序托管账户`
+        `   💰 ${this.formatTokenAmount(
+          this.BUSINESS_CONFIG.PRODUCTS[productAccountIndex].price
+        )} TOKEN 已转入程序托管账户`
       );
       console.log(`   🛍️ 订单状态: 已支付，等待发货`);
     } else {
@@ -3098,7 +3132,17 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   🏪 商户公钥: ${merchantPubkey.toString()}`);
       console.log(`   🏪 商户信息PDA: ${merchantInfoPDA.toString()}`);
 
-      // 执行确认收货指令（添加System Program账户）
+      // 获取vault相关账户地址（从SystemConfig读取）
+      const systemConfigAccount = await this.program.account.systemConfig.fetch(systemConfigPDA);
+      const vaultProgramId = systemConfigAccount.vaultProgramId;
+      const vaultTokenAccount = systemConfigAccount.vaultTokenAccount;
+      const platformTokenAccount = systemConfigAccount.platformTokenAccount;
+
+      console.log(`   🏦 Vault程序ID: ${vaultProgramId.toString()}`);
+      console.log(`   🪙 Vault Token账户: ${vaultTokenAccount.toString()}`);
+      console.log(`   💰 平台Token账户: ${platformTokenAccount.toString()}`);
+
+      // 执行确认收货指令（包含vault相关账户）
       const signature = await this.program.methods
         .confirmDelivery()
         .accounts({
@@ -3109,6 +3153,10 @@ export class EnhancedBusinessFlowExecutor {
           depositEscrowAccount: depositEscrowPDA,
           programTokenAccount: programTokenAccountPDA,
           programAuthority: programAuthorityPDA,
+          // === CPI调用外部vault程序所需的账户 ===
+          vault: vaultProgramId, // 使用vault_program_id作为vault账户地址
+          vaultTokenAccount: vaultTokenAccount,
+          platformTokenAccount: platformTokenAccount,
           buyer: buyer,
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,

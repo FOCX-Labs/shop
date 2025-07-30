@@ -1136,6 +1136,18 @@ export type SolanaECommerce = {
           }
         },
         {
+          "name": "vault",
+          "writable": true
+        },
+        {
+          "name": "vaultTokenAccount",
+          "writable": true
+        },
+        {
+          "name": "platformTokenAccount",
+          "writable": true
+        },
+        {
           "name": "buyer",
           "signer": true
         },
@@ -1248,112 +1260,6 @@ export type SolanaECommerce = {
         {
           "name": "shardIndex",
           "type": "u32"
-        }
-      ]
-    },
-    {
-      "name": "createMerchantOrder",
-      "discriminator": [
-        90,
-        106,
-        124,
-        68,
-        78,
-        247,
-        200,
-        193
-      ],
-      "accounts": [
-        {
-          "name": "merchantOrderCount",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  101,
-                  114,
-                  99,
-                  104,
-                  97,
-                  110,
-                  116,
-                  95,
-                  111,
-                  114,
-                  100,
-                  101,
-                  114,
-                  95,
-                  99,
-                  111,
-                  117,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "merchant.owner",
-                "account": "merchant"
-              }
-            ]
-          }
-        },
-        {
-          "name": "merchantOrder",
-          "writable": true
-        },
-        {
-          "name": "merchant",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  101,
-                  114,
-                  99,
-                  104,
-                  97,
-                  110,
-                  116,
-                  95,
-                  105,
-                  110,
-                  102,
-                  111
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "merchant.owner",
-                "account": "merchant"
-              }
-            ]
-          }
-        },
-        {
-          "name": "authority",
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "systemProgram",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": [
-        {
-          "name": "buyerOrderPda",
-          "type": "pubkey"
-        },
-        {
-          "name": "productId",
-          "type": "u64"
         }
       ]
     },
@@ -1486,6 +1392,48 @@ export type SolanaECommerce = {
               }
             ]
           }
+        },
+        {
+          "name": "merchantOrderCount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchantOrder",
+          "writable": true
         },
         {
           "name": "buyer",
@@ -5132,6 +5080,21 @@ export type SolanaECommerce = {
       "code": 6096,
       "name": "invalidTrackingNumber",
       "msg": "Invalid tracking number"
+    },
+    {
+      "code": 6097,
+      "name": "invalidVaultProgram",
+      "msg": "Invalid vault program"
+    },
+    {
+      "code": 6098,
+      "name": "invalidVaultTokenAccount",
+      "msg": "Invalid vault token account"
+    },
+    {
+      "code": 6099,
+      "name": "invalidPlatformTokenAccount",
+      "msg": "Invalid platform token account"
     }
   ],
   "types": [
@@ -6131,6 +6094,14 @@ export type SolanaECommerce = {
           },
           {
             "name": "vaultProgramId",
+            "type": "pubkey"
+          },
+          {
+            "name": "vaultTokenAccount",
+            "type": "pubkey"
+          },
+          {
+            "name": "platformTokenAccount",
             "type": "pubkey"
           }
         ]

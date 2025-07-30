@@ -401,14 +401,6 @@ pub mod solana_e_commerce {
         )
     }
 
-    pub fn create_merchant_order(
-        ctx: Context<CreateMerchantOrder>,
-        buyer_order_pda: Pubkey,
-        product_id: u64,
-    ) -> Result<()> {
-        instructions::order::create_merchant_order(ctx, buyer_order_pda, product_id)
-    }
-
     pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()> {
         instructions::order::ship_order(ctx, tracking_number)
     }
@@ -490,6 +482,10 @@ pub struct SystemConfig {
     pub auto_confirm_days: u32, // Auto confirm delivery days (default 30 days)
     // Vault program ID configuration
     pub vault_program_id: Pubkey, // Vault program ID for CPI calls to add_rewards
+
+    // Vault相关账户配置
+    pub vault_token_account: Pubkey,    // Vault的Token账户地址
+    pub platform_token_account: Pubkey, // 平台Token账户地址
 }
 
 impl Default for SystemConfig {
@@ -510,6 +506,10 @@ impl Default for SystemConfig {
             auto_confirm_days: 30, // 30 days auto confirm delivery
             // Default vault program ID configuration
             vault_program_id: Pubkey::default(), // Needs to be set during initialization
+
+            // Default vault账户配置
+            vault_token_account: Pubkey::default(), // Needs to be set during initialization
+            platform_token_account: Pubkey::default(), // Needs to be set during initialization
         }
     }
 }

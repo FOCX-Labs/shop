@@ -2,6 +2,10 @@
 .cursor
 .DS_Store
 target
+!target/idl/
+!target/idl/**
+!target/types/
+!target/types/**
 **/*.rs.bk
 node_modules
 test-ledger

@@ -51,19 +51,10 @@ pub struct CreateOrder<'info> {
     )]
     pub merchant: Account<'info, Merchant>,
 
-    #[account(mut)]
-    pub buyer: Signer<'info>,
-
-    pub system_program: Program<'info, System>,
-}
-
-// Create merchant order (independent instruction)
-#[derive(Accounts)]
-#[instruction(buyer_order_pda: Pubkey)]
-pub struct CreateMerchantOrder<'info> {
+    // 商户订单相关账户（集成到CreateOrder中）
     #[account(
         init_if_needed,
-        payer = authority,
+        payer = buyer,
         space = 8 + MerchantOrderCount::INIT_SPACE,
         seeds = [
             b"merchant_order_count",
@@ -75,7 +66,7 @@ pub struct CreateMerchantOrder<'info> {
 
     #[account(
         init,
-        payer = authority,
+        payer = buyer,
         space = 8 + MerchantOrder::INIT_SPACE,
         seeds = [
             b"merchant_order",
@@ -86,14 +77,8 @@ pub struct CreateMerchantOrder<'info> {
     )]
     pub merchant_order: Account<'info, MerchantOrder>,
 
-    #[account(
-        seeds = [b"merchant_info", merchant.owner.as_ref()],
-        bump = merchant.bump
-    )]
-    pub merchant: Account<'info, Merchant>,
-
     #[account(mut)]
-    pub authority: Signer<'info>,
+    pub buyer: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -223,14 +208,34 @@ pub struct ConfirmDelivery<'info> {
     )]
     pub deposit_escrow_account: Account<'info, TokenAccount>,
 
-    // 移除merchant_token_account和platform_fee_account
-    // 当前业务逻辑直接转移全部金额到保证金账户，不需要这两个账户
     /// CHECK: 程序权限账户，用于控制Token转账
     #[account(
         seeds = [b"program_authority"],
         bump
     )]
     pub program_authority: AccountInfo<'info>,
+
+    // === CPI调用外部vault程序所需的账户 ===
+    /// CHECK: Vault账户，使用vault_program_id作为地址
+    #[account(
+        mut,
+        constraint = vault.key() == system_config.vault_program_id @ ErrorCode::InvalidVaultProgram
+    )]
+    pub vault: UncheckedAccount<'info>,
+
+    /// CHECK: Vault Token账户，从system_config读取地址
+    #[account(
+        mut,
+        constraint = vault_token_account.key() == system_config.vault_token_account @ ErrorCode::InvalidVaultTokenAccount
+    )]
+    pub vault_token_account: UncheckedAccount<'info>,
+
+    /// CHECK: 平台Token账户，从system_config读取地址
+    #[account(
+        mut,
+        constraint = platform_token_account.key() == system_config.platform_token_account @ ErrorCode::InvalidPlatformTokenAccount
+    )]
+    pub platform_token_account: UncheckedAccount<'info>,
 
     pub buyer: Signer<'info>,
     pub token_program: Program<'info, Token>,
@@ -273,11 +278,13 @@ pub fn create_order(
     transaction_signature: String,
 ) -> Result<()> {
     let order = &mut ctx.accounts.order;
+    let merchant_order = &mut ctx.accounts.merchant_order;
     let order_stats = &mut ctx.accounts.order_stats;
     let product = &ctx.accounts.product;
     let merchant = &ctx.accounts.merchant;
     let buyer = &ctx.accounts.buyer;
     let user_purchase_count = &mut ctx.accounts.user_purchase_count;
+    let merchant_order_count = &mut ctx.accounts.merchant_order_count;
 
     // Get current timestamp
     let current_timestamp = Clock::get()?.unix_timestamp;
@@ -297,6 +304,13 @@ pub fn create_order(
     }
 
     let _purchase_count = user_purchase_count.increment_count()?;
+
+    // 初始化或更新商户订单计数
+    if merchant_order_count.merchant == Pubkey::default() {
+        merchant_order_count.initialize(merchant.owner, ctx.bumps.merchant_order_count)?;
+    }
+
+    let merchant_order_sequence = merchant_order_count.increment_total_orders()?;
 
     // Initialize order - remove id field, use PDA to ensure uniqueness
     order.buyer = buyer.key();
@@ -323,54 +337,28 @@ pub fn create_order(
     // 验证订单数据
     order.validate()?;
 
-    // 更新订单统计
-    order_stats.update_for_new_order(order);
-
-    msg!(
-        "订单创建成功: ID {}, 买家: {}, 商户: {}, 商品: {}, 数量: {}, 总金额: {} lamports",
-        current_timestamp,
-        buyer.key(),
-        merchant.owner,
-        product_id,
-        quantity,
-        order.total_amount
-    );
-
-    Ok(())
-}
-
-pub fn create_merchant_order(
-    ctx: Context<CreateMerchantOrder>,
-    buyer_order_pda: Pubkey,
-    product_id: u64,
-) -> Result<()> {
-    let merchant_order = &mut ctx.accounts.merchant_order;
-    let merchant = &ctx.accounts.merchant;
-    let merchant_order_count = &mut ctx.accounts.merchant_order_count;
-
-    // 初始化或更新商户订单计数
-    if merchant_order_count.merchant == Pubkey::default() {
-        merchant_order_count.initialize(merchant.owner, ctx.bumps.merchant_order_count)?;
-    }
-
-    let merchant_order_sequence = merchant_order_count.increment_total_orders()?;
-
-    // Initialize merchant order as index pointing to buyer order
+    // 初始化商户订单作为索引
     merchant_order.initialize_as_index(
         merchant.owner,
-        ctx.accounts.authority.key(), // buyer from authority
+        buyer.key(),
         merchant_order_sequence,
-        buyer_order_pda,
+        order.key(),
         product_id,
         ctx.bumps.merchant_order,
     )?;
 
+    // 更新订单统计
+    order_stats.update_for_new_order(order);
+
     msg!(
-        "商户订单创建成功: 商户订单PDA: {}, 商户: {}, 买家订单PDA: {}, 商品ID: {}, 序列号: {}",
+        "双订单创建成功: 买家订单PDA: {}, 商户订单PDA: {}, 买家: {}, 商户: {}, 商品: {}, 数量: {}, 总金额: {} lamports, 商户订单序列号: {}",
+        order.key(),
         merchant_order.key(),
+        buyer.key(),
         merchant.owner,
-        buyer_order_pda,
         product_id,
+        quantity,
+        order.total_amount,
         merchant_order_sequence
     );
 
@@ -536,52 +524,97 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     let program_signer_seeds = &[b"program_authority".as_ref(), &[program_authority_bump]];
     let program_signer = &[&program_signer_seeds[..]];
 
-    // 1. CPI调用外部程序的add_rewards指令，直接将平台手续费转入外部程序
-    // 如果外部程序不存在或调用失败，不影响确认收货流程
+    // 1. 暂时注释掉CPI调用外部程序的add_rewards指令，避免InstructionFallbackNotFound错误
+    // TODO: 在外部vault程序正确配置后重新启用CPI调用
     if platform_fee > 0 {
+        msg!(
+            "平台手续费 {} lamports 将保留在程序托管账户中（CPI调用已暂时禁用）",
+            platform_fee
+        );
+
+        /*
+        // 原CPI调用代码已注释，避免InstructionFallbackNotFound错误
         // 检查vault程序ID是否有效（不是默认的System Program ID）
         if system_config.vault_program_id != anchor_lang::solana_program::system_program::ID {
-            // 构建CPI调用的账户列表
+            // 根据AddRewards结构体构建CPI调用的账户列表
             let add_rewards_accounts = vec![
+                // vault: Account<'info, Vault>
+                ctx.accounts.vault.to_account_info(),
+                // vault_token_account: Account<'info, TokenAccount>
+                ctx.accounts.vault_token_account.to_account_info(),
+                // reward_source_account: Account<'info, TokenAccount> (使用程序Token账户)
                 ctx.accounts.program_token_account.to_account_info(),
+                // platform_token_account: Account<'info, TokenAccount>
+                ctx.accounts.platform_token_account.to_account_info(),
+                // reward_source_authority: Signer<'info> (使用买家作为签名者)
+                ctx.accounts.buyer.to_account_info(),
+                // token_program: Program<'info, Token>
                 ctx.accounts.token_program.to_account_info(),
-                ctx.accounts.system_program.to_account_info(),
             ];
 
+            // 构建add_rewards指令数据
             let add_rewards_data = {
                 let mut data = Vec::new();
-                // 根据外部程序的指令格式构建数据
-                // 这里需要根据实际的add_rewards指令格式来构建
+                // 添加指令discriminator (通常是方法名的hash前8字节)
+                // 这里使用add_rewards的discriminator，需要根据实际外部程序确定
+                let discriminator = [0x8c, 0x3c, 0x2b, 0x1a, 0x9f, 0x8e, 0x7d, 0x6c]; // 示例discriminator
+                data.extend_from_slice(&discriminator);
+                // 添加平台手续费金额参数
                 data.extend_from_slice(&platform_fee.to_le_bytes());
                 data
             };
 
             let add_rewards_instruction = anchor_lang::solana_program::instruction::Instruction {
                 program_id: system_config.vault_program_id,
-                accounts: add_rewards_accounts
-                    .iter()
-                    .map(
-                        |acc| anchor_lang::solana_program::instruction::AccountMeta {
-                            pubkey: acc.key(),
-                            is_signer: acc.is_signer,
-                            is_writable: acc.is_writable,
-                        },
-                    )
-                    .collect(),
+                accounts: vec![
+                    // vault (mut)
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        ctx.accounts.vault.key(),
+                        false,
+                    ),
+                    // vault_token_account (mut)
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        ctx.accounts.vault_token_account.key(),
+                        false,
+                    ),
+                    // reward_source_account (mut) - 程序Token账户
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        ctx.accounts.program_token_account.key(),
+                        false,
+                    ),
+                    // platform_token_account (mut)
+                    anchor_lang::solana_program::instruction::AccountMeta::new(
+                        ctx.accounts.platform_token_account.key(),
+                        false,
+                    ),
+                    // reward_source_authority (signer) - 买家作为签名者
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        ctx.accounts.buyer.key(),
+                        true,
+                    ),
+                    // token_program
+                    anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
+                        ctx.accounts.token_program.key(),
+                        false,
+                    ),
+                ],
                 data: add_rewards_data,
             };
 
             // 尝试调用外部程序，如果失败则记录日志但不中断确认收货流程
-            match anchor_lang::solana_program::program::invoke_signed(
+            // 使用普通invoke而不是invoke_signed，因为买家已经是签名者
+            match anchor_lang::solana_program::program::invoke(
                 &add_rewards_instruction,
                 &add_rewards_accounts,
-                program_signer,
             ) {
                 Ok(_) => {
-                    msg!("外部程序调用成功，平台手续费: {} lamports", platform_fee);
+                    msg!(
+                        "外部vault程序调用成功，平台手续费: {} lamports",
+                        platform_fee
+                    );
                 }
                 Err(e) => {
-                    msg!("外部程序调用失败，继续确认收货流程。错误: {:?}", e);
+                    msg!("外部vault程序调用失败，继续确认收货流程。错误: {:?}", e);
                     msg!(
                         "平台手续费 {} lamports 将保留在程序托管账户中",
                         platform_fee
@@ -590,10 +623,11 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
             }
         } else {
             msg!(
-                "外部程序ID无效，跳过CPI调用，平台手续费 {} lamports 将保留在程序托管账户中",
+                "vault程序ID无效，跳过CPI调用，平台手续费 {} lamports 将保留在程序托管账户中",
                 platform_fee
             );
         }
+        */
     }
 
     // 3. 转移剩余金额（商户实收）到商户保证金账户
