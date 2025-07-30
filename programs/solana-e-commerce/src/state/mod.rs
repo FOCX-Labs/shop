@@ -1,6 +1,8 @@
 pub mod id_generator;
 pub mod keyword_index;
 pub mod merchant;
+pub mod merchant_order;
+pub mod merchant_order_count;
 pub mod order;
 pub mod payment;
 pub mod price_index;
@@ -11,6 +13,8 @@ pub mod user_purchase_count;
 pub use id_generator::*;
 pub use keyword_index::*;
 pub use merchant::*;
+pub use merchant_order::*;
+pub use merchant_order_count::*;
 pub use order::*;
 pub use payment::*;
 pub use price_index::*;

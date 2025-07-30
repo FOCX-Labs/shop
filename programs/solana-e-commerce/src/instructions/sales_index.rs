@@ -5,14 +5,14 @@ use anchor_lang::prelude::*;
 #[derive(Accounts)]
 #[instruction(product_id: u64, old_sales: u32, new_sales: u32)]
 pub struct UpdateProductSalesIndex<'info> {
-    /// CHECK: 旧销量范围的节点，将在指令中验证
+    /// CHECK: Node for old sales range, will be verified in instruction
     #[account(mut)]
     pub old_sales_node: AccountInfo<'info>,
 
-    /// CHECK: 新销量范围的节点，将在指令中验证
+    /// CHECK: Node for new sales range, will be verified in instruction
     #[account(mut)]
     pub new_sales_node: AccountInfo<'info>,
-    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
+    // Remove authority account - completely unused in function implementation, permission verification through PDA seed mechanism
 }
 
 #[derive(Accounts)]
@@ -28,20 +28,20 @@ pub struct RemoveProductFromSalesIndex<'info> {
         bump
     )]
     pub sales_node: Account<'info, SalesIndexNode>,
-    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
+    // Remove authority account - completely unused in function implementation, permission verification through PDA seed mechanism
 }
 
 #[derive(Accounts)]
 #[instruction(min_sales: u32, max_sales: u32)]
 pub struct SearchSalesRange<'info> {
-    /// CHECK: 将在指令中验证正确的销量索引节点
+    /// CHECK: Will verify correct sales index node in instruction
     #[account()]
     pub sales_node: AccountInfo<'info>,
 }
 
 #[derive(Accounts)]
 pub struct GetTopSellingProducts<'info> {
-    /// CHECK: 销量索引根节点
+    /// CHECK: Sales index root node
     #[account()]
     pub sales_root: AccountInfo<'info>,
 }
@@ -52,19 +52,19 @@ pub fn update_product_sales_index(
     old_sales: u32,
     new_sales: u32,
 ) -> Result<()> {
-    // 如果销量范围没有变化，只需要在同一节点内更新
+    // If sales range hasn't changed, only need to update within the same node
     let old_range = find_sales_node_for_sales(old_sales);
     let new_range = find_sales_node_for_sales(new_sales);
 
     if old_range == new_range {
-        // 在同一节点内更新
+        // Update within the same node
         let node_data = ctx.accounts.old_sales_node.try_borrow_data()?;
         let mut sales_node = SalesIndexNode::try_deserialize(&mut &node_data[..])?;
         drop(node_data);
 
         let mut node_data = ctx.accounts.old_sales_node.try_borrow_mut_data()?;
 
-        // 验证这是正确的销量节点
+        // Verify this is the correct sales node
         require!(
             sales_node.contains_sales(old_sales) && sales_node.contains_sales(new_sales),
             ErrorCode::InvalidSalesRange
@@ -99,7 +99,7 @@ pub fn update_product_sales_index(
             old_sales_node.try_serialize(&mut cursor)?;
         }
 
-        // 添加到新节点
+        // Add to new node
         {
             let new_node_data = ctx.accounts.new_sales_node.try_borrow_data()?;
             let mut new_sales_node = SalesIndexNode::try_deserialize(&mut &new_node_data[..])?;
@@ -107,7 +107,7 @@ pub fn update_product_sales_index(
 
             let mut new_node_data = ctx.accounts.new_sales_node.try_borrow_mut_data()?;
 
-            // 验证这是正确的新销量节点
+            // Verify this is the correct new sales node
             require!(
                 new_sales_node.contains_sales(new_sales),
                 ErrorCode::InvalidSalesRange
@@ -116,14 +116,14 @@ pub fn update_product_sales_index(
             new_sales_node.add_product(product_id, new_sales)?;
             new_sales_node.update_top_items(product_id, new_sales)?;
 
-            // 重新序列化新节点
+            // Re-serialize new node
             let mut cursor = std::io::Cursor::new(&mut new_node_data[..]);
             new_sales_node.try_serialize(&mut cursor)?;
         }
     }
 
     msg!(
-        "产品ID {} 销量索引更新成功，从 {} 更新到 {}",
+        "Product ID {} sales index update successful, updated from {} to {}",
         product_id,
         old_sales,
         new_sales
@@ -141,12 +141,15 @@ pub fn remove_product_from_sales_index(
     let removed = sales_node.remove_product(product_id)?;
 
     if removed {
-        // 从热销商品缓存中移除
+        // Remove from bestselling products cache
         sales_node.remove_from_top_items(product_id);
 
-        msg!("产品ID {} 成功从销量索引中移除", product_id);
+        msg!(
+            "Product ID {} successfully removed from sales index",
+            product_id
+        );
     } else {
-        msg!("产品ID {} 不在当前销量索引节点中", product_id);
+        msg!("Product ID {} not in current sales index node", product_id);
     }
 
     Ok(())
@@ -219,26 +222,26 @@ pub fn find_sales_node_for_sales(sales: u32) -> (u32, u32) {
     (range_start, range_end)
 }
 
-// 获取销量索引节点的利用率
+// Get sales index node utilization
 pub fn get_sales_node_utilization(node: &Account<SalesIndexNode>) -> f32 {
     node.product_ids.len() as f32 / MAX_PRODUCTS_PER_SHARD as f32
 }
 
-// 更新全局热销商品排行榜
+// Update global bestseller product rankings
 pub fn update_global_bestsellers(
     sales_nodes: Vec<&Account<SalesIndexNode>>,
 ) -> Result<Vec<ProductSales>> {
     let mut all_top_items = Vec::new();
 
-    // 收集所有节点的热销商品
+    // Collect bestselling products from all nodes
     for node in sales_nodes {
         all_top_items.extend(node.top_items.iter().cloned());
     }
 
-    // 按销量降序排序
+    // Sort by sales in descending order
     all_top_items.sort_by(|a, b| b.sales.cmp(&a.sales));
 
-    // 去重（保留销量最高的记录）
+    // Deduplicate (keep records with highest sales)
     let mut unique_products = std::collections::HashMap::new();
     for item in all_top_items {
         unique_products
@@ -264,10 +267,10 @@ pub fn update_global_bestsellers(
 }
 
 // ============================================================================
-// init_if_needed 版本的指令：供product.rs模块使用
+// init_if_needed version instructions: for use by product.rs module
 // ============================================================================
 
-/// 销量索引初始化（如果需要）的账户结构
+/// Account structure for sales index initialization (if needed)
 #[derive(Accounts)]
 #[instruction(sales_range_start: u32, sales_range_end: u32)]
 pub struct InitializeSalesIndexIfNeeded<'info> {
@@ -290,7 +293,7 @@ pub struct InitializeSalesIndexIfNeeded<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 初始化销量索引（如果需要）
+/// Initialize sales index (if needed)
 pub fn initialize_sales_index_if_needed(
     ctx: Context<InitializeSalesIndexIfNeeded>,
     sales_range_start: u32,
@@ -298,7 +301,7 @@ pub fn initialize_sales_index_if_needed(
 ) -> Result<()> {
     let sales_index = &mut ctx.accounts.sales_index;
 
-    // 如果是新创建的账户，初始化数据
+    // If it's a newly created account, initialize data
     if sales_index.sales_range_start == 0 && sales_index.sales_range_end == 0 {
         sales_index.sales_range_start = sales_range_start;
         sales_index.sales_range_end = sales_range_end;
@@ -311,7 +314,7 @@ pub fn initialize_sales_index_if_needed(
         sales_index.bump = ctx.bumps.sales_index;
 
         msg!(
-            "销量索引初始化完成，范围: {} - {}",
+            "Sales index initialization completed, range: {} - {}",
             sales_range_start,
             sales_range_end
         );
@@ -320,7 +323,7 @@ pub fn initialize_sales_index_if_needed(
     Ok(())
 }
 
-/// 添加产品到销量索引（如果需要则先初始化）的账户结构
+/// Account structure for adding product to sales index (initialize first if needed)
 #[derive(Accounts)]
 #[instruction(sales_range_start: u32, sales_range_end: u32, product_id: u64, sales: u32)]
 pub struct AddProductToSalesIndexIfNeeded<'info> {
@@ -343,7 +346,7 @@ pub struct AddProductToSalesIndexIfNeeded<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 添加产品到销量索引（如果需要则先初始化）
+/// Add product to sales index (initialize first if needed)
 pub fn add_product_to_sales_index_if_needed(
     ctx: Context<AddProductToSalesIndexIfNeeded>,
     sales_range_start: u32,
@@ -353,7 +356,7 @@ pub fn add_product_to_sales_index_if_needed(
 ) -> Result<()> {
     let sales_index = &mut ctx.accounts.sales_index;
 
-    // 如果是新创建的账户，先初始化
+    // If it's a newly created account, initialize first
     if sales_index.sales_range_start == 0 && sales_index.sales_range_end == 0 {
         sales_index.sales_range_start = sales_range_start;
         sales_index.sales_range_end = sales_range_end;
@@ -366,38 +369,38 @@ pub fn add_product_to_sales_index_if_needed(
         sales_index.bump = ctx.bumps.sales_index;
 
         msg!(
-            "销量索引初始化完成，范围: {} - {}",
+            "Sales index initialization completed, range: {} - {}",
             sales_range_start,
             sales_range_end
         );
     }
 
-    // 验证销量在范围内
+    // Verify sales within range
     require!(
         sales >= sales_index.sales_range_start && sales <= sales_index.sales_range_end,
         ErrorCode::InvalidSalesRange
     );
 
-    // 检查产品是否已存在
+    // Check if product already exists
     if sales_index.product_ids.contains(&product_id) {
-        return Ok(()); // 已存在，跳过
+        return Ok(()); // Already exists, skip
     }
 
-    // 检查索引是否已满
+    // Check if index is full
     if sales_index.product_ids.len() >= 1000 {
         return Err(ErrorCode::ShardIsFull.into());
     }
 
-    // 添加产品ID
+    // Add product ID
     sales_index.product_ids.push(product_id);
 
-    // 更新热销商品列表（如果需要）
+    // Update bestselling products list (if needed)
     if sales > 0 {
         update_top_sales_items(&mut sales_index.top_items, product_id, sales)?;
     }
 
     msg!(
-        "产品 {} 已添加到销量索引 [{}, {}]",
+        "Product {} added to sales index [{}, {}]",
         product_id,
         sales_range_start,
         sales_range_end
@@ -406,26 +409,26 @@ pub fn add_product_to_sales_index_if_needed(
     Ok(())
 }
 
-/// 更新热销商品列表
+/// Update bestselling products list
 fn update_top_sales_items(
     top_items: &mut Vec<ProductSales>,
     product_id: u64,
     sales: u32,
 ) -> Result<()> {
-    // 添加新产品到热销列表
+    // Add new product to bestselling list
     top_items.push(ProductSales {
         product_id,
-        merchant: Pubkey::default(), // TODO: 从产品账户获取实际商户信息
-        name: String::new(),         // TODO: 从产品账户获取实际产品名称
-        price: 0,                    // TODO: 从产品账户获取实际价格
+        merchant: Pubkey::default(), // TODO: Get actual merchant info from product account
+        name: String::new(),         // TODO: Get actual product name from product account
+        price: 0,                    // TODO: Get actual price from product account
         sales,
         last_update: Clock::get()?.unix_timestamp,
     });
 
-    // 按销量降序排序
+    // Sort by sales in descending order
     top_items.sort_by(|a, b| b.sales.cmp(&a.sales));
 
-    // 保持最多100个热销商品
+    // Keep at most 100 bestselling products
     if top_items.len() > 100 {
         top_items.truncate(100);
     }

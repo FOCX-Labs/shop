@@ -2,7 +2,7 @@ use anchor_lang::prelude::*;
 
 pub const DEFAULT_CHUNK_SIZE: u32 = 10_000;
 pub const MAX_CHUNKS_PER_MERCHANT: u32 = 100;
-pub const ID_CHUNK_BITMAP_SIZE: usize = 1250; // 10,000位/8 = 1250字节
+pub const ID_CHUNK_BITMAP_SIZE: usize = 1250; // 10,000 bits / 8 = 1250 bytes
 
 #[account]
 #[derive(InitSpace)]
@@ -51,7 +51,7 @@ pub struct IdChunk {
     pub end_id: u64,
     pub next_available: u64,
     #[max_len(1250)]
-    pub bitmap: Vec<u8>, // 改为Vec<u8>以避免栈溢出，最大1250字节
+    pub bitmap: Vec<u8>, // Changed to Vec<u8> to avoid stack overflow, max 1250 bytes
     pub bump: u8,
 }
 
@@ -93,7 +93,7 @@ impl IdChunk {
         }
     }
 
-    /// 安全初始化bitmap
+    /// Safely initialize bitmap
     pub fn initialize_bitmap(&mut self) {
         self.bitmap = vec![0u8; ID_CHUNK_BITMAP_SIZE];
     }

@@ -1,7 +1,7 @@
 use crate::error::ErrorCode;
 use anchor_lang::prelude::*;
 
-// 产品基础信息账户（核心业务数据）
+// Product base information account (core business data)
 #[account]
 #[derive(InitSpace)]
 pub struct ProductBase {
@@ -11,17 +11,17 @@ pub struct ProductBase {
     pub name: String,
     #[max_len(256)]
     pub description: String,
-    pub price: u64, // 代币价格（统一使用token单位）
+    pub price: u64, // Token price (unified using token units)
     #[max_len(128)]
-    pub keywords: String, // 关键词，用逗号分隔（核心搜索字段）
-    pub inventory: u64, // 库存数量
+    pub keywords: String, // Keywords, comma-separated (core search field)
+    pub inventory: u64, // Inventory quantity
     pub sales: u32,
     pub is_active: bool,
     pub created_at: i64,
     pub updated_at: i64,
-    pub payment_token: Pubkey, // 支付代币mint（必需）
+    pub payment_token: Pubkey, // Payment token mint (required)
     #[max_len(128)]
-    pub shipping_location: String, // 发货地址
+    pub shipping_location: String, // Shipping address
     pub bump: u8,
 }
 

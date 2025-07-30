@@ -1,9 +1,9 @@
 use crate::error::ErrorCode;
 use crate::state::{GlobalIdRoot, IdChunk, Merchant, MerchantIdAccount, MerchantStats};
 use anchor_lang::prelude::*;
-// 移除未使用的token导入，因为保证金管理已统一到deposit.rs模块
+// Remove unused token imports as deposit management has been unified to deposit.rs module
 
-// 初始化商户账户
+// Initialize merchant account
 #[derive(Accounts)]
 pub struct InitializeMerchant<'info> {
     #[account(
@@ -15,7 +15,7 @@ pub struct InitializeMerchant<'info> {
     )]
     pub merchant_info: Account<'info, Merchant>,
 
-    // 系统配置账户，用于获取保证金代币mint
+    // System configuration account, used to get deposit token mint
     #[account(
         seeds = [b"system_config"],
         bump
@@ -30,7 +30,7 @@ pub struct InitializeMerchant<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// 更新商户信息
+// Update merchant information
 #[derive(Accounts)]
 pub struct UpdateMerchant<'info> {
     #[account(
@@ -55,7 +55,7 @@ pub fn update_merchant_info(
     Ok(())
 }
 
-// 获取商户统计信息
+// Get merchant statistics
 #[derive(Accounts)]
 pub struct GetMerchantStats<'info> {
     #[account(
@@ -88,7 +88,7 @@ pub fn set_merchant_status(ctx: Context<UpdateMerchant>, is_active: bool) -> Res
     Ok(())
 }
 
-// 增加商户销量
+// Increase merchant sales
 pub fn add_merchant_sales(ctx: Context<UpdateMerchant>, sales_amount: u64) -> Result<()> {
     let merchant_info = &mut ctx.accounts.merchant_info;
     merchant_info.add_sales(sales_amount)?;
@@ -96,7 +96,7 @@ pub fn add_merchant_sales(ctx: Context<UpdateMerchant>, sales_amount: u64) -> Re
     Ok(())
 }
 
-// 关闭商户账户
+// Close merchant account
 #[derive(Accounts)]
 pub struct CloseMerchant<'info> {
     #[account(
@@ -114,11 +114,11 @@ pub struct CloseMerchant<'info> {
     pub owner: Signer<'info>,
 }
 
-// 关闭商户账户实现
+// Close merchant account implementation
 pub fn close_merchant(ctx: Context<CloseMerchant>, force: bool) -> Result<()> {
     let merchant_info = &ctx.accounts.merchant_info;
 
-    // 检查是否还有活跃产品（除非强制删除）
+    // Check if there are still active products (unless force delete)
     if !force {
         require!(
             merchant_info.product_count == 0,
@@ -127,16 +127,16 @@ pub fn close_merchant(ctx: Context<CloseMerchant>, force: bool) -> Result<()> {
     }
 
     msg!(
-        "商户账户已关闭，商户: {}, 强制删除: {}",
+        "Merchant account closed, merchant: {}, force delete: {}",
         merchant_info.owner,
         force
     );
 
-    // 账户将通过close约束自动关闭并回收租金
+    // Account will be automatically closed and rent reclaimed through close constraint
     Ok(())
 }
 
-// 事件定义
+// Event definitions
 #[event]
 pub struct MerchantRegisteredAtomic {
     pub merchant: Pubkey,
@@ -146,9 +146,9 @@ pub struct MerchantRegisteredAtomic {
     pub initial_id_range_end: u64,
 }
 
-// ==================== 完整商户注册功能（包含ID块分配） ====================
+// ==================== Complete merchant registration functionality (including ID chunk allocation) ====================
 
-/// 原子性商户注册账户结构（包含ID块分配）
+/// Atomic merchant registration account structure (including ID chunk allocation)
 #[derive(Accounts)]
 #[instruction(name: String, description: String)]
 pub struct RegisterMerchantAtomic<'info> {
@@ -222,7 +222,7 @@ pub fn register_merchant_atomic(
     global_root.last_merchant_id += 1;
     let merchant_id = global_root.last_merchant_id;
 
-    // 2. 初始化商户信息账户
+    // 2. Initialize merchant information account
     let merchant_info_bump = ctx.bumps.merchant_info;
     let system_config = &ctx.accounts.system_config;
     merchant_info.initialize(

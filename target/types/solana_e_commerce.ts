@@ -953,37 +953,7 @@ export type SolanaECommerce = {
       "accounts": [
         {
           "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "buyerKey"
-              },
-              {
-                "kind": "arg",
-                "path": "merchant"
-              },
-              {
-                "kind": "arg",
-                "path": "productId"
-              },
-              {
-                "kind": "arg",
-                "path": "timestamp"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "orderStats",
@@ -1067,7 +1037,42 @@ export type SolanaECommerce = {
         },
         {
           "name": "programTokenAccount",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "system_config.deposit_token_mint",
+                "account": "systemConfig"
+              }
+            ]
+          }
         },
         {
           "name": "depositEscrowAccount",
@@ -1092,6 +1097,11 @@ export type SolanaECommerce = {
                   111,
                   119
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "system_config.deposit_token_mint",
+                "account": "systemConfig"
               }
             ]
           }
@@ -1132,6 +1142,10 @@ export type SolanaECommerce = {
         {
           "name": "tokenProgram",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -1238,6 +1252,112 @@ export type SolanaECommerce = {
       ]
     },
     {
+      "name": "createMerchantOrder",
+      "discriminator": [
+        90,
+        106,
+        124,
+        68,
+        78,
+        247,
+        200,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "merchantOrderCount",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchantOrder",
+          "writable": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "systemProgram",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "buyerOrderPda",
+          "type": "pubkey"
+        },
+        {
+          "name": "productId",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "createOrder",
       "discriminator": [
         141,
@@ -1288,38 +1408,7 @@ export type SolanaECommerce = {
         },
         {
           "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "buyer"
-              },
-              {
-                "kind": "account",
-                "path": "merchant"
-              },
-              {
-                "kind": "arg",
-                "path": "productId"
-              },
-              {
-                "kind": "account",
-                "path": "user_purchase_count.purchase_count",
-                "account": "userPurchaseCount"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "orderStats",
@@ -1732,7 +1821,7 @@ export type SolanaECommerce = {
         {
           "name": "merchantOwner",
           "docs": [
-            "商户所有者公钥（用于PDA计算）"
+            "Merchant owner public key (for PDA calculation)"
           ]
         },
         {
@@ -3056,6 +3145,10 @@ export type SolanaECommerce = {
                   110,
                   116
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "paymentTokenMint"
               }
             ]
           }
@@ -3092,6 +3185,9 @@ export type SolanaECommerce = {
               }
             ]
           }
+        },
+        {
+          "name": "paymentTokenMint"
         },
         {
           "name": "buyer",
@@ -4220,7 +4316,7 @@ export type SolanaECommerce = {
         {
           "name": "merchantOwner",
           "docs": [
-            "商户所有者（签名者）"
+            "Merchant owner (signer)"
           ],
           "signer": true
         },
@@ -4380,6 +4476,32 @@ export type SolanaECommerce = {
       ]
     },
     {
+      "name": "merchantOrder",
+      "discriminator": [
+        16,
+        61,
+        224,
+        139,
+        71,
+        59,
+        194,
+        150
+      ]
+    },
+    {
+      "name": "merchantOrderCount",
+      "discriminator": [
+        23,
+        11,
+        91,
+        49,
+        176,
+        235,
+        87,
+        136
+      ]
+    },
+    {
       "name": "order",
       "discriminator": [
         134,
@@ -4529,487 +4651,487 @@ export type SolanaECommerce = {
     {
       "code": 6000,
       "name": "missingKeywordAccount",
-      "msg": ""
+      "msg": "Missing keyword account"
     },
     {
       "code": 6001,
       "name": "tooManyKeywords",
-      "msg": ""
+      "msg": "Too many keywords"
     },
     {
       "code": 6002,
       "name": "shardFull",
-      "msg": ""
+      "msg": "Shard space insufficient"
     },
     {
       "code": 6003,
       "name": "idGenerationFailed",
-      "msg": "id"
+      "msg": "ID generation failed"
     },
     {
       "code": 6004,
       "name": "rentCalculationFailed",
-      "msg": ""
+      "msg": "Rent calculation failed"
     },
     {
       "code": 6005,
       "name": "merchantNotRegistered",
-      "msg": ""
+      "msg": "Merchant not registered"
     },
     {
       "code": 6006,
       "name": "idAlreadyInUse",
-      "msg": "id"
+      "msg": "ID already in use"
     },
     {
       "code": 6007,
       "name": "idNotFound",
-      "msg": "id"
+      "msg": "ID not found"
     },
     {
       "code": 6008,
       "name": "idRangeOverflow",
-      "msg": "id"
+      "msg": "ID range overflow"
     },
     {
       "code": 6009,
       "name": "noAvailableId",
-      "msg": "id"
+      "msg": "No available ID"
     },
     {
       "code": 6010,
       "name": "invalidId",
-      "msg": "id"
+      "msg": "Invalid ID"
     },
     {
       "code": 6011,
       "name": "integerOverflow",
-      "msg": ""
+      "msg": "Integer overflow"
     },
     {
       "code": 6012,
       "name": "productNotFound",
-      "msg": ""
+      "msg": "Product not found"
     },
     {
       "code": 6013,
       "name": "invalidProduct",
-      "msg": ""
+      "msg": "Invalid product"
     },
     {
       "code": 6014,
       "name": "invalidProductAccount",
-      "msg": ""
+      "msg": "Invalid product account"
     },
     {
       "code": 6015,
       "name": "invalidPrice",
-      "msg": ""
+      "msg": "Invalid price"
     },
     {
       "code": 6016,
       "name": "invalidAmount",
-      "msg": "0"
+      "msg": "Purchase quantity must be greater than 0"
     },
     {
       "code": 6017,
       "name": "invalidProductName",
-      "msg": ""
+      "msg": "Invalid product name"
     },
     {
       "code": 6018,
       "name": "invalidProductNameLength",
-      "msg": ""
+      "msg": "Invalid product name length"
     },
     {
       "code": 6019,
       "name": "invalidProductDescription",
-      "msg": ""
+      "msg": "Invalid product description"
     },
     {
       "code": 6020,
       "name": "invalidProductDescriptionLength",
-      "msg": ""
+      "msg": "Invalid product description length"
     },
     {
       "code": 6021,
       "name": "tooManyImageUrls",
-      "msg": "url"
+      "msg": "Too many image URLs"
     },
     {
       "code": 6022,
       "name": "tooManySalesRegions",
-      "msg": ""
+      "msg": "Too many sales regions"
     },
     {
       "code": 6023,
       "name": "tooManyLogisticsMethods",
-      "msg": ""
+      "msg": "Too many logistics methods"
     },
     {
       "code": 6024,
       "name": "invalidMerchant",
-      "msg": ""
+      "msg": "Invalid merchant"
     },
     {
       "code": 6025,
       "name": "invalidMerchantNameLength",
-      "msg": ""
+      "msg": "Invalid merchant name length"
     },
     {
       "code": 6026,
       "name": "invalidMerchantDescriptionLength",
-      "msg": ""
+      "msg": "Invalid merchant description length"
     },
     {
       "code": 6027,
       "name": "unauthorizedMerchant",
-      "msg": ""
+      "msg": "Unauthorized merchant operation"
     },
     {
       "code": 6028,
       "name": "invalidKeyword",
-      "msg": ""
+      "msg": "Invalid keyword"
     },
     {
       "code": 6029,
       "name": "invalidKeywordLength",
-      "msg": ""
+      "msg": "Invalid keyword length"
     },
     {
       "code": 6030,
       "name": "invalidKeywordCount",
-      "msg": ""
+      "msg": "Invalid keyword count"
     },
     {
       "code": 6031,
       "name": "duplicateKeyword",
-      "msg": ""
+      "msg": "Duplicate keyword"
     },
     {
       "code": 6032,
       "name": "shardIsFull",
-      "msg": ""
+      "msg": "Shard is full"
     },
     {
       "code": 6033,
       "name": "invalidShardIndex",
-      "msg": ""
+      "msg": "Invalid shard index"
     },
     {
       "code": 6034,
       "name": "priceIndexNodeNotFound",
-      "msg": ""
+      "msg": "Price index node not found"
     },
     {
       "code": 6035,
       "name": "salesIndexNodeNotFound",
-      "msg": ""
+      "msg": "Sales index node not found"
     },
     {
       "code": 6036,
       "name": "invalidPriceRange",
-      "msg": ""
+      "msg": "Invalid price range"
     },
     {
       "code": 6037,
       "name": "invalidSalesRange",
-      "msg": ""
+      "msg": "Invalid sales range"
     },
     {
       "code": 6038,
       "name": "bloomFilterUpdateFailed",
-      "msg": ""
+      "msg": "Bloom filter update failed"
     },
     {
       "code": 6039,
       "name": "keywordIndexNotEmpty",
-      "msg": ""
+      "msg": "Keyword index not empty"
     },
     {
       "code": 6040,
       "name": "keywordShardNotEmpty",
-      "msg": ""
+      "msg": "Keyword shard not empty"
     },
     {
       "code": 6041,
       "name": "merchantHasActiveProducts",
-      "msg": ""
+      "msg": "Merchant has active products"
     },
     {
       "code": 6042,
       "name": "idChunkNotEmpty",
-      "msg": "id"
+      "msg": "ID chunk not empty"
     },
     {
       "code": 6043,
       "name": "merchantIdAccountNotEmpty",
-      "msg": "id"
+      "msg": "Merchant ID account not empty"
     },
     {
       "code": 6044,
       "name": "unsupportedToken",
-      "msg": ""
+      "msg": "Unsupported token"
     },
     {
       "code": 6045,
       "name": "insufficientTokenBalance",
-      "msg": ""
+      "msg": "Insufficient token balance"
     },
     {
       "code": 6046,
       "name": "insufficientSolBalance",
-      "msg": "sol"
+      "msg": "Insufficient SOL balance"
     },
     {
       "code": 6047,
       "name": "invalidTokenAmount",
-      "msg": ""
+      "msg": "Invalid token amount"
     },
     {
       "code": 6048,
       "name": "tokenTransferFailed",
-      "msg": ""
+      "msg": "Token transfer failed"
     },
     {
       "code": 6049,
       "name": "feeCalculationError",
-      "msg": ""
+      "msg": "Fee calculation error"
     },
     {
       "code": 6050,
       "name": "paymentConfigNotFound",
-      "msg": ""
+      "msg": "Payment config not found"
     },
     {
       "code": 6051,
       "name": "tokenNotActive",
-      "msg": ""
+      "msg": "Token not active"
     },
     {
       "code": 6052,
       "name": "belowMinimumAmount",
-      "msg": ""
+      "msg": "Below minimum amount"
     },
     {
       "code": 6053,
       "name": "productCreationFailed",
-      "msg": ""
+      "msg": "Product creation failed"
     },
     {
       "code": 6054,
       "name": "atomicOperationFailed",
-      "msg": ""
+      "msg": "Atomic operation failed"
     },
     {
       "code": 6055,
       "name": "invalidFeeRate",
-      "msg": ""
+      "msg": "Invalid fee rate"
     },
     {
       "code": 6056,
       "name": "tooManyTokens",
-      "msg": ""
+      "msg": "Too many tokens"
     },
     {
       "code": 6057,
       "name": "invalidTokenSymbol",
-      "msg": ""
+      "msg": "Invalid token symbol"
     },
     {
       "code": 6058,
       "name": "invalidTokenDecimals",
-      "msg": ""
+      "msg": "Invalid token decimals"
     },
     {
       "code": 6059,
       "name": "invalidOrderStatus",
-      "msg": ""
+      "msg": "Invalid order status"
     },
     {
       "code": 6060,
       "name": "invalidPaymentMethod",
-      "msg": ""
+      "msg": "Invalid payment method"
     },
     {
       "code": 6061,
       "name": "orderNotFound",
-      "msg": ""
+      "msg": "Order not found"
     },
     {
       "code": 6062,
       "name": "invalidOrderQuantity",
-      "msg": ""
+      "msg": "Invalid order quantity"
     },
     {
       "code": 6063,
       "name": "invalidOrderPrice",
-      "msg": ""
+      "msg": "Invalid order price"
     },
     {
       "code": 6064,
       "name": "invalidOrderTotalAmount",
-      "msg": ""
+      "msg": "Invalid order total amount"
     },
     {
       "code": 6065,
       "name": "invalidOrderTokenPrice",
-      "msg": ""
+      "msg": "Invalid order token price"
     },
     {
       "code": 6066,
       "name": "invalidOrderTokenTotalAmount",
-      "msg": ""
+      "msg": "Invalid order token total amount"
     },
     {
       "code": 6067,
       "name": "invalidShippingAddressLength",
-      "msg": ""
+      "msg": "Invalid shipping address length"
     },
     {
       "code": 6068,
       "name": "invalidOrderNotesLength",
-      "msg": ""
+      "msg": "Invalid order notes length"
     },
     {
       "code": 6069,
       "name": "invalidTransactionSignature",
-      "msg": ""
+      "msg": "Invalid transaction signature"
     },
     {
       "code": 6070,
       "name": "invalidOrderStatusTransition",
-      "msg": ""
+      "msg": "Invalid order status transition"
     },
     {
       "code": 6071,
       "name": "orderCannotBeModified",
-      "msg": ""
+      "msg": "Order cannot be modified"
     },
     {
       "code": 6072,
       "name": "orderCannotBeRefunded",
-      "msg": ""
+      "msg": "Order cannot be refunded"
     },
     {
       "code": 6073,
       "name": "orderAlreadyExists",
-      "msg": ""
+      "msg": "Order already exists"
     },
     {
       "code": 6074,
       "name": "unauthorized",
-      "msg": ""
+      "msg": "Unauthorized operation"
     },
     {
       "code": 6075,
       "name": "invalidTimestamp",
-      "msg": ""
+      "msg": "Invalid timestamp"
     },
     {
       "code": 6076,
       "name": "invalidAccountOwner",
-      "msg": ""
+      "msg": "Invalid account owner"
     },
     {
       "code": 6077,
       "name": "invalidAccountData",
-      "msg": ""
+      "msg": "Invalid account data"
     },
     {
       "code": 6078,
       "name": "invalidAccountSize",
-      "msg": ""
+      "msg": "Invalid account size"
     },
     {
       "code": 6079,
       "name": "invalidPda",
-      "msg": "pda"
+      "msg": "Invalid PDA"
     },
     {
       "code": 6080,
       "name": "invalidAccountSeeds",
-      "msg": ""
+      "msg": "Invalid account seeds"
     },
     {
       "code": 6081,
       "name": "invalidAccountBump",
-      "msg": "bump"
+      "msg": "Invalid account bump"
     },
     {
       "code": 6082,
       "name": "insufficientFunds",
-      "msg": ""
+      "msg": "Insufficient funds"
     },
     {
       "code": 6083,
       "name": "invalidActiveChunk",
-      "msg": ""
+      "msg": "Invalid active chunk"
     },
     {
       "code": 6084,
       "name": "accountDiscriminatorMismatch",
-      "msg": ""
+      "msg": "Account discriminator mismatch"
     },
     {
       "code": 6085,
       "name": "insufficientAccounts",
-      "msg": ""
+      "msg": "Insufficient accounts"
     },
     {
       "code": 6086,
       "name": "insufficientDeposit",
-      "msg": ""
+      "msg": "Insufficient deposit"
     },
     {
       "code": 6087,
       "name": "insufficientLockedDeposit",
-      "msg": ""
+      "msg": "Insufficient locked deposit"
     },
     {
       "code": 6088,
       "name": "invalidDepositToken",
-      "msg": ""
+      "msg": "Invalid deposit token"
     },
     {
       "code": 6089,
       "name": "invalidDepositAmount",
-      "msg": ""
+      "msg": "Invalid deposit amount"
     },
     {
       "code": 6090,
       "name": "merchantDepositInsufficient",
-      "msg": "商户保证金不足，无法进行交易"
+      "msg": "Merchant deposit insufficient for transaction"
     },
     {
       "code": 6091,
       "name": "depositAlreadyLocked",
-      "msg": ""
+      "msg": "Deposit already locked"
     },
     {
       "code": 6092,
       "name": "depositNotLocked",
-      "msg": ""
+      "msg": "Deposit not locked"
     },
     {
       "code": 6093,
       "name": "arithmeticOverflow",
-      "msg": ""
+      "msg": "Arithmetic overflow"
     },
     {
       "code": 6094,
       "name": "arithmeticUnderflow",
-      "msg": ""
+      "msg": "Arithmetic underflow"
     },
     {
       "code": 6095,
       "name": "trackingNumberRequired",
-      "msg": ""
+      "msg": "Tracking number required for shipping"
     },
     {
       "code": 6096,
       "name": "invalidTrackingNumber",
-      "msg": ""
+      "msg": "Invalid tracking number"
     }
   ],
   "types": [
@@ -5248,7 +5370,7 @@ export type SolanaECommerce = {
     {
       "name": "merchantDepositInfo",
       "docs": [
-        "商户保证金信息结构"
+        "Merchant deposit information structure"
       ],
       "type": {
         "kind": "struct",
@@ -5310,6 +5432,76 @@ export type SolanaECommerce = {
             "type": {
               "vec": "pubkey"
             }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "merchantOrder",
+      "docs": [
+        "商家订单账户 - 纯索引功能，用于商家快速查询和定位买家订单"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchantOrderSequence",
+            "type": "u64"
+          },
+          {
+            "name": "buyerOrderPda",
+            "type": "pubkey"
+          },
+          {
+            "name": "productId",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "merchantOrderCount",
+      "docs": [
+        "商家订单计数账户 - 记录商家接收的订单总数，为商家订单提供唯一序列号"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "totalOrders",
+            "type": "u64"
+          },
+          {
+            "name": "createdAt",
+            "type": "i64"
+          },
+          {
+            "name": "updatedAt",
+            "type": "i64"
           },
           {
             "name": "bump",
@@ -5476,6 +5668,10 @@ export type SolanaECommerce = {
           {
             "name": "transactionSignature",
             "type": "string"
+          },
+          {
+            "name": "merchantOrderPda",
+            "type": "pubkey"
           },
           {
             "name": "bump",
@@ -5934,7 +6130,7 @@ export type SolanaECommerce = {
             "type": "u32"
           },
           {
-            "name": "externalProgramId",
+            "name": "vaultProgramId",
             "type": "pubkey"
           }
         ]

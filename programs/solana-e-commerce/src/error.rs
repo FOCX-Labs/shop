@@ -2,217 +2,217 @@ use anchor_lang::prelude::*;
 
 #[error_code]
 pub enum ErrorCode {
-    // ID生成器相关错误
-    #[msg("缺少关键词账户")]
+    // ID generator related errors
+    #[msg("Missing keyword account")]
     MissingKeywordAccount,
-    #[msg("关键词数量超出限制")]
+    #[msg("Too many keywords")]
     TooManyKeywords,
-    #[msg("分片空间不足")]
+    #[msg("Shard space insufficient")]
     ShardFull,
-    #[msg("ID生成失败")]
+    #[msg("ID generation failed")]
     IdGenerationFailed,
-    #[msg("租金计算失败")]
+    #[msg("Rent calculation failed")]
     RentCalculationFailed,
-    #[msg("商户未注册")]
+    #[msg("Merchant not registered")]
     MerchantNotRegistered,
-    #[msg("ID已被使用")]
+    #[msg("ID already in use")]
     IdAlreadyInUse,
-    #[msg("ID不存在")]
+    #[msg("ID not found")]
     IdNotFound,
-    #[msg("ID区间超出范围")]
+    #[msg("ID range overflow")]
     IdRangeOverflow,
-    #[msg("无可用ID")]
+    #[msg("No available ID")]
     NoAvailableId,
-    #[msg("无效的ID")]
+    #[msg("Invalid ID")]
     InvalidId,
-    #[msg("整数溢出")]
+    #[msg("Integer overflow")]
     IntegerOverflow,
 
-    // 商品相关错误
-    #[msg("商品不存在")]
+    // Product related errors
+    #[msg("Product not found")]
     ProductNotFound,
-    #[msg("无效的商品")]
+    #[msg("Invalid product")]
     InvalidProduct,
-    #[msg("无效的商品账户")]
+    #[msg("Invalid product account")]
     InvalidProductAccount,
-    #[msg("无效的价格")]
+    #[msg("Invalid price")]
     InvalidPrice,
-    #[msg("购买数量必须大于0")]
+    #[msg("Purchase quantity must be greater than 0")]
     InvalidAmount,
-    #[msg("无效的商品名称")]
+    #[msg("Invalid product name")]
     InvalidProductName,
-    #[msg("无效的商品名称长度")]
+    #[msg("Invalid product name length")]
     InvalidProductNameLength,
-    #[msg("无效的商品描述")]
+    #[msg("Invalid product description")]
     InvalidProductDescription,
-    #[msg("无效的商品描述长度")]
+    #[msg("Invalid product description length")]
     InvalidProductDescriptionLength,
-    #[msg("图片URL数量过多")]
+    #[msg("Too many image URLs")]
     TooManyImageUrls,
-    #[msg("销售区域数量过多")]
+    #[msg("Too many sales regions")]
     TooManySalesRegions,
-    #[msg("物流方式数量过多")]
+    #[msg("Too many logistics methods")]
     TooManyLogisticsMethods,
 
-    // 商户相关错误
-    #[msg("无效的商户")]
+    // Merchant related errors
+    #[msg("Invalid merchant")]
     InvalidMerchant,
-    #[msg("无效的商户名称长度")]
+    #[msg("Invalid merchant name length")]
     InvalidMerchantNameLength,
-    #[msg("无效的商户描述长度")]
+    #[msg("Invalid merchant description length")]
     InvalidMerchantDescriptionLength,
-    #[msg("未授权的商户操作")]
+    #[msg("Unauthorized merchant operation")]
     UnauthorizedMerchant,
 
-    // 关键词相关错误
-    #[msg("无效的关键词")]
+    // Keyword related errors
+    #[msg("Invalid keyword")]
     InvalidKeyword,
-    #[msg("无效的关键词长度")]
+    #[msg("Invalid keyword length")]
     InvalidKeywordLength,
-    #[msg("无效的关键词数量")]
+    #[msg("Invalid keyword count")]
     InvalidKeywordCount,
-    #[msg("重复的关键词")]
+    #[msg("Duplicate keyword")]
     DuplicateKeyword,
 
-    // 索引相关错误
-    #[msg("分片已满")]
+    // Index related errors
+    #[msg("Shard is full")]
     ShardIsFull,
-    #[msg("无效的分片索引")]
+    #[msg("Invalid shard index")]
     InvalidShardIndex,
-    #[msg("价格索引节点不存在")]
+    #[msg("Price index node not found")]
     PriceIndexNodeNotFound,
-    #[msg("销量索引节点不存在")]
+    #[msg("Sales index node not found")]
     SalesIndexNodeNotFound,
-    #[msg("无效的价格区间")]
+    #[msg("Invalid price range")]
     InvalidPriceRange,
-    #[msg("无效的销量区间")]
+    #[msg("Invalid sales range")]
     InvalidSalesRange,
-    #[msg("布隆过滤器更新失败")]
+    #[msg("Bloom filter update failed")]
     BloomFilterUpdateFailed,
-    #[msg("关键词索引不为空")]
+    #[msg("Keyword index not empty")]
     KeywordIndexNotEmpty,
-    #[msg("关键词分片不为空")]
+    #[msg("Keyword shard not empty")]
     KeywordShardNotEmpty,
-    #[msg("商户仍有活跃产品")]
+    #[msg("Merchant has active products")]
     MerchantHasActiveProducts,
-    #[msg("ID块不为空")]
+    #[msg("ID chunk not empty")]
     IdChunkNotEmpty,
-    #[msg("商户ID账户不为空")]
+    #[msg("Merchant ID account not empty")]
     MerchantIdAccountNotEmpty,
 
-    // 支付相关错误
-    #[msg("不支持的代币")]
+    // Payment related errors
+    #[msg("Unsupported token")]
     UnsupportedToken,
-    #[msg("代币余额不足")]
+    #[msg("Insufficient token balance")]
     InsufficientTokenBalance,
-    #[msg("SOL余额不足")]
+    #[msg("Insufficient SOL balance")]
     InsufficientSolBalance,
-    #[msg("无效的代币金额")]
+    #[msg("Invalid token amount")]
     InvalidTokenAmount,
-    #[msg("代币转账失败")]
+    #[msg("Token transfer failed")]
     TokenTransferFailed,
-    #[msg("手续费计算错误")]
+    #[msg("Fee calculation error")]
     FeeCalculationError,
-    #[msg("支付配置未找到")]
+    #[msg("Payment config not found")]
     PaymentConfigNotFound,
-    #[msg("代币未激活")]
+    #[msg("Token not active")]
     TokenNotActive,
-    #[msg("低于最小交易金额")]
+    #[msg("Below minimum amount")]
     BelowMinimumAmount,
-    #[msg("商品创建失败")]
+    #[msg("Product creation failed")]
     ProductCreationFailed,
-    #[msg("原子操作失败")]
+    #[msg("Atomic operation failed")]
     AtomicOperationFailed,
-    #[msg("无效的手续费率")]
+    #[msg("Invalid fee rate")]
     InvalidFeeRate,
-    #[msg("代币数量过多")]
+    #[msg("Too many tokens")]
     TooManyTokens,
-    #[msg("无效的代币符号")]
+    #[msg("Invalid token symbol")]
     InvalidTokenSymbol,
-    #[msg("无效的代币精度")]
+    #[msg("Invalid token decimals")]
     InvalidTokenDecimals,
-    #[msg("无效的订单状态")]
+    #[msg("Invalid order status")]
     InvalidOrderStatus,
-    #[msg("无效的支付方式")]
+    #[msg("Invalid payment method")]
     InvalidPaymentMethod,
 
-    // 订单相关错误
-    #[msg("订单不存在")]
+    // Order related errors
+    #[msg("Order not found")]
     OrderNotFound,
-    #[msg("无效的订单数量")]
+    #[msg("Invalid order quantity")]
     InvalidOrderQuantity,
-    #[msg("无效的订单价格")]
+    #[msg("Invalid order price")]
     InvalidOrderPrice,
-    #[msg("无效的订单总金额")]
+    #[msg("Invalid order total amount")]
     InvalidOrderTotalAmount,
-    #[msg("无效的订单代币价格")]
+    #[msg("Invalid order token price")]
     InvalidOrderTokenPrice,
-    #[msg("无效的订单代币总金额")]
+    #[msg("Invalid order token total amount")]
     InvalidOrderTokenTotalAmount,
-    #[msg("无效的收货地址长度")]
+    #[msg("Invalid shipping address length")]
     InvalidShippingAddressLength,
-    #[msg("无效的订单备注长度")]
+    #[msg("Invalid order notes length")]
     InvalidOrderNotesLength,
-    #[msg("无效的交易签名")]
+    #[msg("Invalid transaction signature")]
     InvalidTransactionSignature,
-    #[msg("无效的订单状态转换")]
+    #[msg("Invalid order status transition")]
     InvalidOrderStatusTransition,
-    #[msg("订单无法修改")]
+    #[msg("Order cannot be modified")]
     OrderCannotBeModified,
-    #[msg("订单无法退款")]
+    #[msg("Order cannot be refunded")]
     OrderCannotBeRefunded,
-    #[msg("订单已存在")]
+    #[msg("Order already exists")]
     OrderAlreadyExists,
 
-    // 系统相关错误
-    #[msg("未授权操作")]
+    // System related errors
+    #[msg("Unauthorized operation")]
     Unauthorized,
-    #[msg("无效的时间戳")]
+    #[msg("Invalid timestamp")]
     InvalidTimestamp,
-    #[msg("无效的账户所有者")]
+    #[msg("Invalid account owner")]
     InvalidAccountOwner,
-    #[msg("无效的账户数据")]
+    #[msg("Invalid account data")]
     InvalidAccountData,
-    #[msg("无效的账户大小")]
+    #[msg("Invalid account size")]
     InvalidAccountSize,
-    #[msg("无效的PDA")]
+    #[msg("Invalid PDA")]
     InvalidPda,
-    #[msg("无效的账户种子")]
+    #[msg("Invalid account seeds")]
     InvalidAccountSeeds,
-    #[msg("无效的账户bump")]
+    #[msg("Invalid account bump")]
     InvalidAccountBump,
-    #[msg("余额不足")]
+    #[msg("Insufficient funds")]
     InsufficientFunds,
-    #[msg("无效的活跃块")]
+    #[msg("Invalid active chunk")]
     InvalidActiveChunk,
-    #[msg("账户判别器不匹配")]
+    #[msg("Account discriminator mismatch")]
     AccountDiscriminatorMismatch,
-    #[msg("账户数量不足")]
+    #[msg("Insufficient accounts")]
     InsufficientAccounts,
 
-    // 保证金相关错误
-    #[msg("保证金不足")]
+    // Deposit related errors
+    #[msg("Insufficient deposit")]
     InsufficientDeposit,
-    #[msg("锁定保证金不足")]
+    #[msg("Insufficient locked deposit")]
     InsufficientLockedDeposit,
-    #[msg("无效的保证金代币")]
+    #[msg("Invalid deposit token")]
     InvalidDepositToken,
-    #[msg("保证金金额无效")]
+    #[msg("Invalid deposit amount")]
     InvalidDepositAmount,
-    #[msg("商户保证金不足，无法进行交易")]
+    #[msg("Merchant deposit insufficient for transaction")]
     MerchantDepositInsufficient,
-    #[msg("保证金已锁定")]
+    #[msg("Deposit already locked")]
     DepositAlreadyLocked,
-    #[msg("保证金未锁定")]
+    #[msg("Deposit not locked")]
     DepositNotLocked,
-    #[msg("算术溢出")]
+    #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
-    #[msg("算术下溢")]
+    #[msg("Arithmetic underflow")]
     ArithmeticUnderflow,
 
-    // 物流单号相关错误
-    #[msg("发货时必须提供物流单号")]
+    // Tracking number related errors
+    #[msg("Tracking number required for shipping")]
     TrackingNumberRequired,
-    #[msg("无效的物流单号")]
+    #[msg("Invalid tracking number")]
     InvalidTrackingNumber,
 }

@@ -139,17 +139,17 @@ pub fn create_keyword_shard(
     let prev_shard = &mut ctx.accounts.prev_shard;
     let new_shard = &mut ctx.accounts.new_shard;
 
-    // 验证关键词匹配
+    // Verify keyword match
     require!(keyword_root.keyword == keyword, ErrorCode::InvalidKeyword);
     require!(prev_shard.keyword == keyword, ErrorCode::InvalidKeyword);
 
-    // 验证分片索引连续性
+    // Verify shard index continuity
     require!(
         prev_shard.shard_index + 1 == shard_index,
         ErrorCode::InvalidShardIndex
     );
 
-    // 初始化新分片
+    // Initialize new shard
     new_shard.initialize(
         keyword.clone(),
         shard_index,
@@ -157,13 +157,17 @@ pub fn create_keyword_shard(
         ctx.bumps.new_shard,
     )?;
 
-    // 更新前一个分片的链接
+    // Update previous shard's link
     prev_shard.next_shard = Some(new_shard.key());
 
-    // 更新根的统计
+    // Update root statistics
     keyword_root.add_shard(new_shard.key());
 
-    msg!("关键词 {} 的新分片 {} 创建成功", keyword, shard_index);
+    msg!(
+        "New shard {} for keyword {} created successfully",
+        shard_index,
+        keyword
+    );
 
     Ok(())
 }
@@ -176,19 +180,19 @@ pub fn search_keyword_index(
 ) -> Result<Vec<u64>> {
     let keyword_root = &ctx.accounts.keyword_root;
 
-    // 验证关键词匹配
+    // Verify keyword match
     require!(keyword_root.keyword == keyword, ErrorCode::InvalidKeyword);
 
     if keyword_root.total_products == 0 {
         return Ok(Vec::new());
     }
 
-    // 这里只返回第一个分片的结果作为示例
-    // 实际实现需要遍历所有分片
-    let results = Vec::new(); // 简化实现
+    // Here only return first shard results as example
+    // Actual implementation needs to traverse all shards
+    let results = Vec::new(); // Simplified implementation
 
     msg!(
-        "关键词 {} 搜索完成，偏移: {}, 限制: {}",
+        "Keyword {} search completed, offset: {}, limit: {}",
         keyword,
         offset,
         limit
@@ -197,17 +201,17 @@ pub fn search_keyword_index(
     Ok(results)
 }
 
-// 检查分片是否需要分裂
+// Check if shard needs splitting
 pub fn check_shard_split_needed(shard: &Account<KeywordShard>) -> bool {
     shard.needs_split()
 }
 
-// 检查分片是否需要合并
+// Check if shard needs merging
 pub fn check_shard_merge_needed(shard: &Account<KeywordShard>) -> bool {
     shard.needs_merge()
 }
 
-// 关闭关键词根账户
+// Close keyword root account
 pub fn close_keyword_root(
     ctx: Context<CloseKeywordRoot>,
     keyword: String,
@@ -215,10 +219,10 @@ pub fn close_keyword_root(
 ) -> Result<()> {
     let keyword_root = &ctx.accounts.keyword_root;
 
-    // 验证关键词匹配
+    // Verify keyword match
     require!(keyword_root.keyword == keyword, ErrorCode::InvalidKeyword);
 
-    // 检查是否为空（除非强制删除）
+    // Check if empty (unless force delete)
     if !force {
         require!(
             keyword_root.total_products == 0,
@@ -227,12 +231,12 @@ pub fn close_keyword_root(
     }
 
     msg!(
-        "关键词根账户已关闭，关键词: {}, 强制删除: {}",
+        "Keyword root account closed, keyword: {}, force delete: {}",
         keyword,
         force
     );
 
-    // 账户将通过close约束自动关闭并回收租金
+    // Account will be automatically closed and rent reclaimed through close constraint
     Ok(())
 }
 
@@ -303,7 +307,7 @@ pub struct InitializeKeywordIndexIfNeeded<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 初始化关键词索引（如果需要）
+/// Initialize keyword index (if needed)
 pub fn initialize_keyword_index_if_needed(
     ctx: Context<InitializeKeywordIndexIfNeeded>,
     keyword: String,
@@ -311,7 +315,7 @@ pub fn initialize_keyword_index_if_needed(
     let keyword_root = &mut ctx.accounts.keyword_root;
     let first_shard = &mut ctx.accounts.first_shard;
 
-    // 如果是新创建的根账户，初始化数据
+    // If it's a newly created root account, initialize data
     if keyword_root.keyword.is_empty() {
         keyword_root.keyword = keyword.clone();
         keyword_root.total_products = 0;
@@ -321,10 +325,13 @@ pub fn initialize_keyword_index_if_needed(
         keyword_root.bloom_filter = [0u8; 256];
         keyword_root.bump = ctx.bumps.keyword_root;
 
-        msg!("关键词根账户初始化完成，关键词: {}", keyword);
+        msg!(
+            "Keyword root account initialization completed, keyword: {}",
+            keyword
+        );
     }
 
-    // 如果是新创建的分片账户，初始化数据
+    // If it's a newly created shard account, initialize data
     if first_shard.keyword.is_empty() {
         first_shard.keyword = keyword.clone();
         first_shard.shard_index = 0;
@@ -342,7 +349,7 @@ pub fn initialize_keyword_index_if_needed(
     Ok(())
 }
 
-/// 添加产品到关键词索引（如果需要则先初始化）的账户结构
+/// Account structure for adding product to keyword index (initialize first if needed)
 #[derive(Accounts)]
 #[instruction(keyword: String, product_id: u64)]
 pub struct AddProductToKeywordIndexIfNeeded<'info> {
@@ -370,7 +377,7 @@ pub struct AddProductToKeywordIndexIfNeeded<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 添加产品到关键词索引（如果需要则先初始化）
+/// Add product to keyword index (initialize first if needed)
 pub fn add_product_to_keyword_index_if_needed(
     ctx: Context<AddProductToKeywordIndexIfNeeded>,
     keyword: String,
@@ -379,7 +386,7 @@ pub fn add_product_to_keyword_index_if_needed(
     let keyword_root = &mut ctx.accounts.keyword_root;
     let target_shard = &mut ctx.accounts.target_shard;
 
-    // 如果是新创建的根账户，先初始化
+    // If it's a newly created root account, initialize first
     if keyword_root.keyword.is_empty() {
         keyword_root.keyword = keyword.clone();
         keyword_root.total_products = 0;
@@ -389,10 +396,13 @@ pub fn add_product_to_keyword_index_if_needed(
         keyword_root.bloom_filter = [0u8; 256];
         keyword_root.bump = ctx.bumps.keyword_root;
 
-        msg!("关键词根账户初始化完成，关键词: {}", keyword);
+        msg!(
+            "Keyword root account initialization completed, keyword: {}",
+            keyword
+        );
     }
 
-    // 如果是新创建的分片账户，先初始化
+    // If it's a newly created shard account, initialize first
     if target_shard.keyword.is_empty() {
         target_shard.keyword = keyword.clone();
         target_shard.shard_index = 0;

@@ -31,7 +31,10 @@ pub fn initialize_system(ctx: Context<InitializeSystem>, config: SystemConfig) -
     global_root.bloom_filter_size = config.bloom_filter_size;
     global_root.bump = ctx.bumps.global_root;
 
-    msg!("系统初始化成功，块大小: {}", config.chunk_size);
+    msg!(
+        "System initialization successful, chunk size: {}",
+        config.chunk_size
+    );
 
     Ok(())
 }
@@ -71,7 +74,7 @@ pub fn initialize_system_config(
     system_config.platform_fee_rate = config.platform_fee_rate;
     system_config.platform_fee_recipient = config.platform_fee_recipient;
     system_config.auto_confirm_days = config.auto_confirm_days;
-    system_config.external_program_id = config.external_program_id;
+    system_config.vault_program_id = config.vault_program_id;
 
     msg!(
         "系统配置初始化成功，管理员: {}, 保证金要求: {} tokens",
@@ -122,7 +125,7 @@ pub fn close_system_config(ctx: Context<CloseSystemConfig>, force: bool) -> Resu
     Ok(())
 }
 
-/// 强制关闭不兼容的系统配置账户（手动转移余额）
+/// Force close incompatible system configuration account (manual balance transfer)
 #[derive(Accounts)]
 pub struct ForceCloseSystemConfig<'info> {
     #[account(

@@ -5,7 +5,7 @@ use crate::state::{
 };
 use anchor_lang::prelude::*;
 
-// ID生成器功能
+// ID generator functionality
 #[derive(Accounts)]
 pub struct GenerateId<'info> {
     #[account(
@@ -34,16 +34,16 @@ pub fn generate_product_id(ctx: Context<GenerateId>) -> Result<u64> {
     let merchant_account = &mut ctx.accounts.merchant_account;
     let active_chunk = &mut ctx.accounts.active_chunk;
 
-    // 检查当前块是否有可用ID
+    // Check if current chunk has available IDs
     if active_chunk.is_full() {
         return Err(ErrorCode::NoAvailableId.into());
     }
 
-    // 查找下一个可用的ID
+    // Find next available ID
     let mut local_id = active_chunk.next_available;
     while local_id < active_chunk.capacity() {
         if !active_chunk.is_id_used(local_id) {
-            // 分配这个ID
+            // Allocate this ID
             active_chunk.mark_id_used(local_id);
             active_chunk.next_available = local_id + 1;
             merchant_account.last_local_id = local_id;
@@ -51,7 +51,7 @@ pub fn generate_product_id(ctx: Context<GenerateId>) -> Result<u64> {
             let global_id = active_chunk.start_id + local_id;
 
             msg!(
-                "生成产品ID成功，商户: {}, 本地ID: {}, 全局ID: {}",
+                "Product ID generation successful, merchant: {}, local ID: {}, global ID: {}",
                 merchant_account.merchant_id,
                 local_id,
                 global_id
@@ -110,7 +110,7 @@ pub fn allocate_new_chunk(ctx: Context<AllocateChunk>) -> Result<Pubkey> {
     let _payer = &ctx.accounts.payer;
     let _system_program = &ctx.accounts.system_program;
 
-    // 更新商户块索引
+    // Update merchant chunk index
     merchant_account.last_chunk_index += 1;
     let chunk_index = merchant_account.last_chunk_index;
 
@@ -119,8 +119,8 @@ pub fn allocate_new_chunk(ctx: Context<AllocateChunk>) -> Result<Pubkey> {
         ErrorCode::InvalidShardIndex
     );
 
-    // 初始化新块 - 使用基于商户ID的范围
-    let merchant_start_id = merchant_account.merchant_id as u64 * 10000; // 每个商户预留10000个ID
+    // Initialize new chunk - use merchant ID based range
+    let merchant_start_id = merchant_account.merchant_id as u64 * 10000; // Reserve 10000 IDs per merchant
     let chunk_start_id = merchant_start_id + (chunk_index as u64 * global_root.chunk_size as u64);
     let new_chunk = &mut ctx.accounts.new_chunk;
     new_chunk.merchant_id = merchant_account.merchant_id;
@@ -128,21 +128,21 @@ pub fn allocate_new_chunk(ctx: Context<AllocateChunk>) -> Result<Pubkey> {
     new_chunk.start_id = chunk_start_id;
     new_chunk.end_id = chunk_start_id + global_root.chunk_size as u64 - 1;
     new_chunk.next_available = 0;
-    new_chunk.initialize_bitmap(); // 使用安全的初始化方法
+    new_chunk.initialize_bitmap(); // Use safe initialization method
     new_chunk.bump = ctx.bumps.new_chunk;
 
-    // 更新全局ID计数器
+    // Update global ID counter
     global_root.last_global_id = new_chunk.end_id + 1;
 
-    // 将旧的活跃块加入未使用队列
+    // Add old active chunk to unused queue
     let old_active_chunk = merchant_account.active_chunk;
     merchant_account.unused_chunks.push(old_active_chunk);
 
-    // 设置新的活跃块
+    // Set new active chunk
     merchant_account.active_chunk = new_chunk.key();
 
     msg!(
-        "分配新ID块成功，商户: {}, 块索引: {}, ID范围: {} - {}",
+        "New ID chunk allocation successful, merchant: {}, chunk index: {}, ID range: {} - {}",
         merchant_account.merchant_id,
         chunk_index,
         new_chunk.start_id,
@@ -152,7 +152,7 @@ pub fn allocate_new_chunk(ctx: Context<AllocateChunk>) -> Result<Pubkey> {
     Ok(new_chunk.key())
 }
 
-// 4. ID存在性验证
+// 4. ID existence verification
 #[derive(Accounts)]
 #[instruction(id: u64)]
 pub struct VerifyId<'info> {
@@ -164,16 +164,16 @@ pub struct VerifyId<'info> {
 
     pub merchant: Signer<'info>,
 
-    /// CHECK: 会在指令中验证这是正确的ID块
+    /// CHECK: Will verify this is the correct ID chunk in the instruction
     pub id_chunk: AccountInfo<'info>,
 }
 
 pub fn is_id_exists(ctx: Context<VerifyId>, id: u64) -> Result<bool> {
     let merchant_account = &ctx.accounts.merchant_account;
 
-    // 计算ID应该在哪个块中
+    // Calculate which chunk the ID should be in
     let chunk_size = DEFAULT_CHUNK_SIZE as u64;
-    let merchant_start_id = merchant_account.merchant_id as u64 * 10000; // 每个商户预留10000个ID
+    let merchant_start_id = merchant_account.merchant_id as u64 * 10000; // Reserve 10000 IDs per merchant
 
     if id < merchant_start_id {
         return Ok(false);
@@ -181,7 +181,7 @@ pub fn is_id_exists(ctx: Context<VerifyId>, id: u64) -> Result<bool> {
 
     let chunk_index = (id - merchant_start_id) / chunk_size;
 
-    // 验证ID块账户
+    // Verify ID chunk account
     let merchant_key_bytes = ctx.accounts.merchant.key().to_bytes();
     let chunk_index_bytes = (chunk_index as u32).to_le_bytes();
     let expected_chunk_seeds = [
@@ -234,7 +234,7 @@ pub fn batch_generate_ids(ctx: Context<BatchGenerate>, count: u16) -> Result<Vec
     let merchant_account = &mut ctx.accounts.merchant_account;
     let active_chunk = &mut ctx.accounts.active_chunk;
 
-    require!(count > 0 && count <= 100, ErrorCode::InvalidId); // 限制批量数量
+    require!(count > 0 && count <= 100, ErrorCode::InvalidId); // Limit batch quantity
 
     let mut ids = Vec::new();
     let mut local_id = active_chunk.next_available;
@@ -258,7 +258,7 @@ pub fn batch_generate_ids(ctx: Context<BatchGenerate>, count: u16) -> Result<Vec
     require!(allocated == count, ErrorCode::NoAvailableId);
 
     msg!(
-        "批量生成ID成功，商户: {}, 数量: {}",
+        "Batch ID generation successful, merchant: {}, quantity: {}",
         merchant_account.merchant_id,
         allocated
     );
@@ -266,7 +266,7 @@ pub fn batch_generate_ids(ctx: Context<BatchGenerate>, count: u16) -> Result<Vec
     Ok(ids)
 }
 
-// 6. ID回收
+// 6. ID recycling
 #[derive(Accounts)]
 pub struct ReleaseId<'info> {
     #[account(mut)]
@@ -286,7 +286,7 @@ pub fn release_id(ctx: Context<ReleaseId>, id: u64) -> Result<()> {
     Ok(())
 }
 
-// 辅助函数：块切换/预分配
+// Helper function: chunk switching/pre-allocation
 pub fn switch_or_allocate_chunk<'info>(
     merchant: &mut Account<'info, MerchantIdAccount>,
     root: &mut Account<'info, GlobalIdRoot>,
@@ -294,13 +294,13 @@ pub fn switch_or_allocate_chunk<'info>(
     _system_program: &Program<'info, System>,
     program_id: &Pubkey,
 ) -> Result<Pubkey> {
-    // 优先用未用块
+    // Prioritize using unused chunks
     if let Some(next_chunk) = merchant.unused_chunks.pop() {
         merchant.active_chunk = next_chunk;
         merchant.last_chunk_index += 1;
         return Ok(next_chunk);
     }
-    // 否则新建块
+    // Otherwise create new chunk
     let new_chunk_index = merchant.last_chunk_index + 1;
     require!(
         new_chunk_index <= MAX_CHUNKS_PER_MERCHANT,
@@ -323,7 +323,7 @@ pub fn switch_or_allocate_chunk<'info>(
     Ok(chunk_key)
 }
 
-// 纯函数：分配ID
+// Pure function: allocate ID
 pub fn allocate_id_in_chunk(
     merchant: &mut Account<MerchantIdAccount>,
     chunk: &mut Account<IdChunk>,
@@ -352,7 +352,7 @@ pub fn allocate_id_in_chunk(
     Ok(global_id)
 }
 
-// 纯函数：回收ID
+// Pure function: recycle ID
 pub fn release_id_in_chunk(chunk: &mut Account<IdChunk>, id: u64) -> Result<()> {
     require!(
         id >= chunk.start_id && id <= chunk.end_id,
@@ -365,17 +365,17 @@ pub fn release_id_in_chunk(chunk: &mut Account<IdChunk>, id: u64) -> Result<()> 
     Ok(())
 }
 
-// 检查块利用率
+// Check chunk utilization
 pub fn check_chunk_utilization(chunk: &Account<IdChunk>) -> f32 {
     chunk.utilization_rate()
 }
 
-// 预分配下一个块（优化性能）
+// Pre-allocate next chunk (performance optimization)
 pub fn should_preallocate_chunk(chunk: &Account<IdChunk>) -> bool {
-    chunk.utilization_rate() > 0.8 // 超过80%使用率时预分配
+    chunk.utilization_rate() > 0.8 // Pre-allocate when utilization exceeds 80%
 }
 
-// 关闭ID块账户
+// Close ID chunk account
 #[derive(Accounts)]
 #[instruction(merchant_key: Pubkey, chunk_index: u32)]
 pub struct CloseIdChunk<'info> {
@@ -389,10 +389,10 @@ pub struct CloseIdChunk<'info> {
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
-    // 移除merchant账户 - 权限验证通过PDA种子机制已经实现
+    // Remove merchant account - permission verification already implemented through PDA seed mechanism
 }
 
-// 关闭商户ID账户
+// Close merchant ID account
 #[derive(Accounts)]
 #[instruction(merchant_key: Pubkey)]
 pub struct CloseMerchantIdAccount<'info> {
@@ -406,10 +406,10 @@ pub struct CloseMerchantIdAccount<'info> {
 
     #[account(mut)]
     pub beneficiary: Signer<'info>,
-    // 移除merchant账户 - 权限验证通过PDA种子机制已经实现
+    // Remove merchant account - permission verification already implemented through PDA seed mechanism
 }
 
-// 关闭ID块账户实现
+// Close ID chunk account implementation
 pub fn close_id_chunk(
     ctx: Context<CloseIdChunk>,
     _merchant_key: Pubkey,
@@ -418,7 +418,7 @@ pub fn close_id_chunk(
 ) -> Result<()> {
     let id_chunk = &ctx.accounts.id_chunk;
 
-    // 检查是否为空（除非强制删除）
+    // Check if empty (unless force delete)
     if !force {
         require!(
             id_chunk.utilization_rate() == 0.0,
@@ -427,16 +427,16 @@ pub fn close_id_chunk(
     }
 
     msg!(
-        "ID块账户已关闭，块索引: {}, 强制删除: {}",
+        "ID chunk account closed, chunk index: {}, force delete: {}",
         _chunk_index,
         force
     );
 
-    // 账户将通过close约束自动关闭并回收租金
+    // Account will be automatically closed and rent reclaimed through close constraint
     Ok(())
 }
 
-// 关闭商户ID账户实现
+// Close merchant ID account implementation
 pub fn close_merchant_id_account(
     ctx: Context<CloseMerchantIdAccount>,
     _merchant_key: Pubkey,
@@ -444,7 +444,7 @@ pub fn close_merchant_id_account(
 ) -> Result<()> {
     let merchant_id_account = &ctx.accounts.merchant_id_account;
 
-    // 检查是否还有活跃块（除非强制删除）
+    // Check if there are still active chunks (unless force delete)
     if !force {
         require!(
             merchant_id_account.unused_chunks.is_empty(),
@@ -453,11 +453,11 @@ pub fn close_merchant_id_account(
     }
 
     msg!(
-        "商户ID账户已关闭，商户: {}, 强制删除: {}",
+        "Merchant ID account closed, merchant: {}, force delete: {}",
         merchant_id_account.merchant_id,
         force
     );
 
-    // 账户将通过close约束自动关闭并回收租金
+    // Account will be automatically closed and rent reclaimed through close constraint
     Ok(())
 }

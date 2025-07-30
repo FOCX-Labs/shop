@@ -1,9 +1,9 @@
 use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
-use anchor_spl::token::{transfer, Token, TokenAccount, Transfer};
+use anchor_spl::token::{transfer, Mint, Token, TokenAccount, Transfer};
 
-// 创建订单
+// Create order (original - for backward compatibility)
 #[derive(Accounts)]
 #[instruction(product_id: u64)]
 pub struct CreateOrder<'info> {
@@ -24,11 +24,9 @@ pub struct CreateOrder<'info> {
         payer = buyer,
         space = 8 + Order::INIT_SPACE,
         seeds = [
-            b"order",
+            b"buyer_order",
             buyer.key().as_ref(),
-            merchant.key().as_ref(),
-            product_id.to_le_bytes().as_ref(),
-            user_purchase_count.purchase_count.to_le_bytes().as_ref()
+            (user_purchase_count.purchase_count + 1).to_le_bytes().as_ref()
         ],
         bump
     )]
@@ -55,6 +53,47 @@ pub struct CreateOrder<'info> {
 
     #[account(mut)]
     pub buyer: Signer<'info>,
+
+    pub system_program: Program<'info, System>,
+}
+
+// Create merchant order (independent instruction)
+#[derive(Accounts)]
+#[instruction(buyer_order_pda: Pubkey)]
+pub struct CreateMerchantOrder<'info> {
+    #[account(
+        init_if_needed,
+        payer = authority,
+        space = 8 + MerchantOrderCount::INIT_SPACE,
+        seeds = [
+            b"merchant_order_count",
+            merchant.owner.as_ref()
+        ],
+        bump
+    )]
+    pub merchant_order_count: Account<'info, MerchantOrderCount>,
+
+    #[account(
+        init,
+        payer = authority,
+        space = 8 + MerchantOrder::INIT_SPACE,
+        seeds = [
+            b"merchant_order",
+            merchant.owner.as_ref(),
+            (merchant_order_count.total_orders + 1).to_le_bytes().as_ref()
+        ],
+        bump
+    )]
+    pub merchant_order: Account<'info, MerchantOrder>,
+
+    #[account(
+        seeds = [b"merchant_info", merchant.owner.as_ref()],
+        bump = merchant.bump
+    )]
+    pub merchant: Account<'info, Merchant>,
+
+    #[account(mut)]
+    pub authority: Signer<'info>,
 
     pub system_program: Program<'info, System>,
 }
@@ -96,7 +135,7 @@ pub struct RefundOrder<'info> {
     // 主程序统一托管账户（退款来源）
     #[account(
         mut,
-        seeds = [b"program_token_account"],
+        seeds = [b"program_token_account", payment_token_mint.key().as_ref()],
         bump
     )]
     pub program_token_account: Account<'info, TokenAccount>,
@@ -110,6 +149,8 @@ pub struct RefundOrder<'info> {
         bump
     )]
     pub program_authority: AccountInfo<'info>,
+
+    pub payment_token_mint: Account<'info, Mint>,
 
     pub buyer: Signer<'info>,
     pub token_program: Program<'info, Token>,
@@ -137,18 +178,9 @@ pub struct InitializeOrderStats<'info> {
 
 // 确认收货
 #[derive(Accounts)]
-#[instruction(buyer_key: Pubkey, merchant: Pubkey, product_id: u64, timestamp: i64)]
 pub struct ConfirmDelivery<'info> {
     #[account(
         mut,
-        seeds = [
-            b"order",
-            buyer_key.as_ref(),
-            merchant.as_ref(),
-            product_id.to_le_bytes().as_ref(),
-            timestamp.to_le_bytes().as_ref()
-        ],
-        bump = order.bump,
         constraint = order.buyer == buyer.key() @ ErrorCode::Unauthorized
     )]
     pub order: Account<'info, Order>,
@@ -175,13 +207,17 @@ pub struct ConfirmDelivery<'info> {
     )]
     pub system_config: Account<'info, crate::SystemConfig>,
 
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [b"program_token_account", system_config.deposit_token_mint.as_ref()],
+        bump
+    )]
     pub program_token_account: Account<'info, TokenAccount>,
 
     // 保证金托管账户（接收确认收货的资金）
     #[account(
         mut,
-        seeds = [b"deposit_escrow"],
+        seeds = [b"deposit_escrow", system_config.deposit_token_mint.as_ref()],
         bump,
         constraint = deposit_escrow_account.mint == system_config.deposit_token_mint @ ErrorCode::InvalidDepositToken
     )]
@@ -198,6 +234,7 @@ pub struct ConfirmDelivery<'info> {
 
     pub buyer: Signer<'info>,
     pub token_program: Program<'info, Token>,
+    pub system_program: Program<'info, System>,
 }
 
 // 获取订单统计
@@ -242,13 +279,13 @@ pub fn create_order(
     let buyer = &ctx.accounts.buyer;
     let user_purchase_count = &mut ctx.accounts.user_purchase_count;
 
-    // 获取当前时间戳
+    // Get current timestamp
     let current_timestamp = Clock::get()?.unix_timestamp;
 
-    // 验证产品ID匹配
+    // Verify product ID match
     require!(product.id == product_id, ErrorCode::InvalidProduct);
 
-    // 验证商户匹配
+    // Verify merchant match
     require!(
         product.merchant == merchant.owner,
         ErrorCode::InvalidMerchant
@@ -261,7 +298,7 @@ pub fn create_order(
 
     let _purchase_count = user_purchase_count.increment_count()?;
 
-    // 初始化订单 - 移除id字段，使用PDA确保唯一性
+    // Initialize order - remove id field, use PDA to ensure uniqueness
     order.buyer = buyer.key();
     order.merchant = merchant.owner;
     order.product_id = product_id;
@@ -302,15 +339,53 @@ pub fn create_order(
     Ok(())
 }
 
+pub fn create_merchant_order(
+    ctx: Context<CreateMerchantOrder>,
+    buyer_order_pda: Pubkey,
+    product_id: u64,
+) -> Result<()> {
+    let merchant_order = &mut ctx.accounts.merchant_order;
+    let merchant = &ctx.accounts.merchant;
+    let merchant_order_count = &mut ctx.accounts.merchant_order_count;
+
+    // 初始化或更新商户订单计数
+    if merchant_order_count.merchant == Pubkey::default() {
+        merchant_order_count.initialize(merchant.owner, ctx.bumps.merchant_order_count)?;
+    }
+
+    let merchant_order_sequence = merchant_order_count.increment_total_orders()?;
+
+    // Initialize merchant order as index pointing to buyer order
+    merchant_order.initialize_as_index(
+        merchant.owner,
+        ctx.accounts.authority.key(), // buyer from authority
+        merchant_order_sequence,
+        buyer_order_pda,
+        product_id,
+        ctx.bumps.merchant_order,
+    )?;
+
+    msg!(
+        "商户订单创建成功: 商户订单PDA: {}, 商户: {}, 买家订单PDA: {}, 商品ID: {}, 序列号: {}",
+        merchant_order.key(),
+        merchant.owner,
+        buyer_order_pda,
+        product_id,
+        merchant_order_sequence
+    );
+
+    Ok(())
+}
+
 pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()> {
     let order = &mut ctx.accounts.order;
     let order_stats = &mut ctx.accounts.order_stats;
     let merchant = &ctx.accounts.merchant;
 
-    // 验证订单属于该商户
+    // Verify order belongs to this merchant
     require!(order.merchant == merchant.owner, ErrorCode::InvalidMerchant);
 
-    // 验证物流单号
+    // Verify tracking number
     require!(
         !tracking_number.is_empty() && tracking_number.len() <= 100,
         ErrorCode::InvalidTrackingNumber
@@ -319,13 +394,13 @@ pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()
     let old_status = order.status.clone();
     let current_time = Clock::get()?.unix_timestamp;
 
-    // 设置物流单号
+    // Set tracking number
     order.tracking_number = tracking_number.clone();
 
-    // 更新订单状态为已发货
+    // Update order status to shipped
     order.update_status(OrderManagementStatus::Shipped, current_time)?;
 
-    // 更新统计信息
+    // Update statistics
     order_stats.update_for_status_change(
         &old_status,
         &OrderManagementStatus::Shipped,
@@ -462,41 +537,63 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     let program_signer = &[&program_signer_seeds[..]];
 
     // 1. CPI调用外部程序的add_rewards指令，直接将平台手续费转入外部程序
+    // 如果外部程序不存在或调用失败，不影响确认收货流程
     if platform_fee > 0 {
-        // 构建CPI调用的账户列表
-        let add_rewards_accounts = vec![
-            ctx.accounts.program_token_account.to_account_info(),
-            ctx.accounts.token_program.to_account_info(),
-        ];
+        // 检查vault程序ID是否有效（不是默认的System Program ID）
+        if system_config.vault_program_id != anchor_lang::solana_program::system_program::ID {
+            // 构建CPI调用的账户列表
+            let add_rewards_accounts = vec![
+                ctx.accounts.program_token_account.to_account_info(),
+                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.system_program.to_account_info(),
+            ];
 
-        let add_rewards_data = {
-            let mut data = Vec::new();
-            // 根据外部程序的指令格式构建数据
-            // 这里需要根据实际的add_rewards指令格式来构建
-            data.extend_from_slice(&platform_fee.to_le_bytes());
-            data
-        };
+            let add_rewards_data = {
+                let mut data = Vec::new();
+                // 根据外部程序的指令格式构建数据
+                // 这里需要根据实际的add_rewards指令格式来构建
+                data.extend_from_slice(&platform_fee.to_le_bytes());
+                data
+            };
 
-        let add_rewards_instruction = anchor_lang::solana_program::instruction::Instruction {
-            program_id: system_config.external_program_id,
-            accounts: add_rewards_accounts
-                .iter()
-                .map(
-                    |acc| anchor_lang::solana_program::instruction::AccountMeta {
-                        pubkey: acc.key(),
-                        is_signer: acc.is_signer,
-                        is_writable: acc.is_writable,
-                    },
-                )
-                .collect(),
-            data: add_rewards_data,
-        };
+            let add_rewards_instruction = anchor_lang::solana_program::instruction::Instruction {
+                program_id: system_config.vault_program_id,
+                accounts: add_rewards_accounts
+                    .iter()
+                    .map(
+                        |acc| anchor_lang::solana_program::instruction::AccountMeta {
+                            pubkey: acc.key(),
+                            is_signer: acc.is_signer,
+                            is_writable: acc.is_writable,
+                        },
+                    )
+                    .collect(),
+                data: add_rewards_data,
+            };
 
-        anchor_lang::solana_program::program::invoke_signed(
-            &add_rewards_instruction,
-            &add_rewards_accounts,
-            program_signer,
-        )?;
+            // 尝试调用外部程序，如果失败则记录日志但不中断确认收货流程
+            match anchor_lang::solana_program::program::invoke_signed(
+                &add_rewards_instruction,
+                &add_rewards_accounts,
+                program_signer,
+            ) {
+                Ok(_) => {
+                    msg!("外部程序调用成功，平台手续费: {} lamports", platform_fee);
+                }
+                Err(e) => {
+                    msg!("外部程序调用失败，继续确认收货流程。错误: {:?}", e);
+                    msg!(
+                        "平台手续费 {} lamports 将保留在程序托管账户中",
+                        platform_fee
+                    );
+                }
+            }
+        } else {
+            msg!(
+                "外部程序ID无效，跳过CPI调用，平台手续费 {} lamports 将保留在程序托管账户中",
+                platform_fee
+            );
+        }
     }
 
     // 3. 转移剩余金额（商户实收）到商户保证金账户
@@ -513,23 +610,23 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     );
     transfer(merchant_cpi_ctx, merchant_amount)?;
 
-    // 更新商户保证金余额（只添加商户实收金额，不包括平台手续费）
+    // Update merchant deposit balance (only add merchant's actual received amount, excluding platform fees)
     merchant_info.add_deposit(merchant_amount)?;
 
     let old_status = order.status.clone();
     let current_time = Clock::get()?.unix_timestamp;
 
-    // 更新为已送达状态
+    // Update to delivered status
     order.update_status(OrderManagementStatus::Delivered, current_time)?;
 
-    // 更新统计信息
+    // Update statistics
     order_stats.update_for_status_change(
         &old_status,
         &OrderManagementStatus::Delivered,
         order.total_amount,
     );
 
-    // 验证代币转账是否成功
+    // Verify token transfer success
     let deposit_balance_after = ctx.accounts.deposit_escrow_account.amount;
     let program_balance_after = ctx.accounts.program_token_account.amount;
 
@@ -562,7 +659,7 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     Ok(())
 }
 
-/// 自动确认收货（商户或管理员调用）
+/// Auto confirm delivery (called by merchant or administrator)
 #[derive(Accounts)]
 pub struct AutoConfirmDelivery<'info> {
     #[account(mut)]
@@ -575,7 +672,7 @@ pub struct AutoConfirmDelivery<'info> {
     )]
     pub order_stats: Account<'info, OrderStats>,
 
-    // 商户账户（用于权限验证）
+    // Merchant account (for permission verification)
     #[account(
         seeds = [b"merchant_info", merchant.owner.as_ref()],
         bump = merchant.bump

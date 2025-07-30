@@ -10,27 +10,27 @@ pub use hash::*;
 pub use pagination::*;
 pub use validation::*;
 
-// 布隆过滤器相关常量
+// Bloom filter related constants
 pub const BLOOM_FILTER_SIZE: usize = 256;
 pub const BLOOM_HASH_COUNT: u8 = 3;
 
-// 分页相关常量
+// Pagination related constants
 pub const DEFAULT_PAGE_SIZE: u16 = 20;
 pub const MAX_PAGE_SIZE: u16 = 100;
 
-// 索引分片相关常量
+// Index sharding related constants
 pub const SHARD_SPLIT_THRESHOLD: f32 = 0.8;
 pub const SHARD_MERGE_THRESHOLD: f32 = 0.25;
 pub const MIN_SHARD_SIZE: usize = 10;
 
-// 搜索结果排序
+// Search result sorting
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq)]
 pub enum SortOrder {
     Ascending,
     Descending,
 }
 
-// 搜索结果过滤器
+// Search result filter
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SearchFilter {
     pub price_min: Option<u64>,
@@ -56,7 +56,7 @@ impl Default for SearchFilter {
     }
 }
 
-// 搜索结果
+// Search result
 #[derive(AnchorSerialize, AnchorDeserialize, Clone)]
 pub struct SearchResult {
     pub product_ids: Vec<u64>,
@@ -83,7 +83,7 @@ impl SearchResult {
     }
 }
 
-// 性能统计
+// Performance statistics
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct PerformanceStats {
     pub query_time_ms: u64,
@@ -105,7 +105,7 @@ impl Default for PerformanceStats {
     }
 }
 
-// 内存使用统计
+// Memory usage statistics
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Debug)]
 pub struct MemoryStats {
     pub total_accounts: u32,
@@ -116,12 +116,12 @@ pub struct MemoryStats {
     pub product_accounts: u32,
 }
 
-// 计算账户租金
+// Calculate account rent
 pub fn calculate_rent(size: usize, rent: &Rent) -> u64 {
     rent.minimum_balance(size)
 }
 
-// 验证PDA种子
+// Verify PDA seeds
 pub fn verify_pda(expected_key: &Pubkey, seeds: &[&[u8]], program_id: &Pubkey) -> Result<u8> {
     let (derived_key, bump) = Pubkey::find_program_address(seeds, program_id);
     require!(
@@ -131,17 +131,17 @@ pub fn verify_pda(expected_key: &Pubkey, seeds: &[&[u8]], program_id: &Pubkey) -
     Ok(bump)
 }
 
-// 时间戳工具
+// Timestamp utilities
 pub fn get_current_timestamp() -> Result<i64> {
     Ok(Clock::get()?.unix_timestamp)
 }
 
-// 计算两个时间戳之间的差值（秒）
+// Calculate difference between two timestamps (seconds)
 pub fn calculate_time_diff(start: i64, end: i64) -> u64 {
     (end - start).max(0) as u64
 }
 
-// 生成随机种子（用于布隆过滤器等）
+// Generate random seed (for bloom filter, etc.)
 pub fn generate_seed(base: u64, salt: u64) -> u64 {
     base.wrapping_mul(0x9e3779b97f4a7c15)
         .wrapping_add(salt)
@@ -149,7 +149,7 @@ pub fn generate_seed(base: u64, salt: u64) -> u64 {
         .rotate_left(13)
 }
 
-// 检查字符串是否为有效的关键词
+// Check if string is a valid keyword
 pub fn is_valid_keyword(keyword: &str) -> bool {
     !keyword.is_empty()
         && keyword.len() <= crate::state::MAX_KEYWORD_LENGTH
@@ -158,7 +158,7 @@ pub fn is_valid_keyword(keyword: &str) -> bool {
             .all(|c| c.is_alphanumeric() || c.is_whitespace() || c == '-' || c == '_')
 }
 
-// 标准化关键词（转换为小写，去除多余空格）
+// Normalize keyword (convert to lowercase, remove extra spaces)
 pub fn normalize_keyword(keyword: &str) -> String {
     keyword
         .to_lowercase()

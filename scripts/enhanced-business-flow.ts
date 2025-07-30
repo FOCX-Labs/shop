@@ -21,80 +21,80 @@ import {
 } from "@solana/spl-token";
 
 /**
- * 增强的业务流程执行器
- * 实现您要求的功能：
- * 1. 商户注册和保证金缴纳在同一交易中
- * 2. 商户获得1.5 SOL用于产品创建
- * 3. 买家创建和购买操作
+ * Enhanced Business Flow Executor
+ * Implements the requested functionality:
+ * 1. Merchant registration and deposit payment in the same transaction
+ * 2. Merchant receives 1.5 SOL for product creation
+ * 3. Buyer creation and purchase operations
  */
 export class EnhancedBusinessFlowExecutor {
   private connection: anchor.web3.Connection;
   private program: Program<SolanaECommerce>;
   private authority: Keypair;
   private tokenMint?: PublicKey;
-  private tokenSymbol: string = "TOKEN"; // 动态获取的Token符号
+  private tokenSymbol: string = "TOKEN"; // Dynamically obtained Token symbol
   private merchantKeypair?: Keypair;
   private merchantTokenAccount?: PublicKey;
   private buyerKeypair?: Keypair;
   private buyerTokenAccount?: PublicKey;
   private createdProducts: PublicKey[] = [];
-  private createdProductIds: number[] = []; // 存储产品ID
-  private purchaseEscrowAccount?: PublicKey; // 购买托管账户
-  private orderTimestamp?: number; // 保存订单创建时间戳
+  private createdProductIds: number[] = []; // Store product IDs
+  private purchaseEscrowAccount?: PublicKey; // Purchase escrow account
+  private orderTimestamp?: number; // Save order creation timestamp
 
-  // 业务配置
+  // Business configuration
   private readonly BUSINESS_CONFIG = {
     MERCHANT_DEPOSIT_REQUIRED: 1000 * Math.pow(10, 9), // 1000 tokens
     PRODUCTS: [
       {
         name: "iPhone 15 Pro",
-        description: "最新款苹果手机，配备A17 Pro芯片",
-        price: 50, // Token价格 (50 Token)
-        keywords: ["手机", "苹果", "iPhone"],
+        description: "Latest Apple phone with A17 Pro chip",
+        price: 50, // Token price (50 Token)
+        keywords: ["phone", "apple", "iPhone"],
       },
       {
         name: "MacBook Pro",
-        description: "专业级笔记本电脑，适合开发者使用",
-        price: 100, // Token价格 (100 Token)
-        keywords: ["电脑", "苹果", "MacBook"],
+        description: "Professional laptop computer, suitable for developers",
+        price: 100, // Token price (100 Token)
+        keywords: ["computer", "apple", "MacBook"],
       },
     ],
   };
 
   constructor() {
-    // 检查是否为本地环境
+    // Check if it's local environment
     const isLocal = process.argv.includes("--local");
 
     if (isLocal) {
-      // 本地环境：清除代理设置
+      // Local environment: clear proxy settings
       delete process.env.https_proxy;
       delete process.env.http_proxy;
 
-      // 设置本地RPC
+      // Set local RPC
       process.env.ANCHOR_PROVIDER_URL = "http://localhost:8899";
     } else {
-      // Devnet环境：设置网络代理
+      // Devnet environment: set network proxy
       process.env.https_proxy = "http://127.0.0.1:7890";
       process.env.http_proxy = "http://127.0.0.1:7890";
 
-      // 设置Devnet RPC
+      // Set Devnet RPC
       process.env.ANCHOR_PROVIDER_URL =
         "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef";
     }
 
     process.env.ANCHOR_WALLET = process.env.HOME + "/.config/solana/id.json";
 
-    // 初始化连接
+    // Initialize connection
     const provider = anchor.AnchorProvider.env();
     anchor.setProvider(provider);
 
     this.connection = provider.connection;
     this.program = anchor.workspace.SolanaECommerce as Program<SolanaECommerce>;
     this.authority = (provider.wallet as anchor.Wallet).payer;
-    // tokenMint 将在 initializeTokenMint 方法中初始化
+    // tokenMint will be initialized in initializeTokenMint method
 
-    console.log(`🔗 连接到: ${this.connection.rpcEndpoint}`);
-    console.log(`👤 权限账户: ${this.authority.publicKey.toString()}`);
+    console.log(`🔗 Connected to: ${this.connection.rpcEndpoint}`);
+    console.log(`👤 Authority account: ${this.authority.publicKey.toString()}`);
   }
 
   private calculatePDA(seeds: (string | Buffer)[]): [PublicKey, number] {
@@ -138,21 +138,21 @@ export class EnhancedBusinessFlowExecutor {
       console.log(`   📊 商户ID账户数据大小: ${data.length} 字节`);
 
       try {
-        // 手动解析旧格式数据
-        // 跳过discriminator (8字节)
+        // Manually parse old format data
+        // Skip discriminator (8 bytes)
         const merchantId = data.readUInt32LE(8); // u32
         const lastChunkIndex = data.readUInt32LE(12); // u32
-        const lastLocalId = data.readBigUInt64LE(16); // u64 (这个字段可能已经是u64)
+        const lastLocalId = data.readBigUInt64LE(16); // u64 (this field might already be u64)
 
-        // activeChunk是Pubkey，32字节，从偏移量24开始
+        // activeChunk is Pubkey, 32 bytes, starting from offset 24
         const activeChunkBytes = data.slice(24, 56);
         const activeChunk = new PublicKey(activeChunkBytes);
 
         console.log(
-          `   🔧 商户ID兼容性解析: merchantId=${merchantId}, lastChunkIndex=${lastChunkIndex}`
+          `   🔧 Merchant ID compatibility parsing: merchantId=${merchantId}, lastChunkIndex=${lastChunkIndex}`
         );
         console.log(
-          `   🔧 商户ID兼容性解析: lastLocalId=${lastLocalId}, activeChunk=${activeChunk.toString()}`
+          `   🔧 Merchant ID compatibility parsing: lastLocalId=${lastLocalId}, activeChunk=${activeChunk.toString()}`
         );
 
         return {
@@ -160,8 +160,12 @@ export class EnhancedBusinessFlowExecutor {
           activeChunk: activeChunk,
         };
       } catch (parseError) {
-        console.log(`   ❌ 商户ID兼容性解析失败: ${(parseError as Error).message}`);
-        throw new Error(`无法解析商户ID账户数据: ${(parseError as Error).message}`);
+        console.log(
+          `   ❌ Merchant ID compatibility parsing failed: ${(parseError as Error).message}`
+        );
+        throw new Error(
+          `Unable to parse merchant ID account data: ${(parseError as Error).message}`
+        );
       }
     }
   }
@@ -462,34 +466,34 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
-   * 步骤0: 系统初始化
+   * Step 0: System Initialization
    */
   async step0_systemInitialization(): Promise<void> {
-    console.log("\n🌐 步骤0: 系统初始化");
+    console.log("\n🌐 Step 0: System Initialization");
     console.log("==================================================");
 
     try {
-      // 初始化Token Mint
+      // Initialize Token Mint
       await this.initializeTokenMint();
 
-      // 初始化全局ID根账户
+      // Initialize global ID root account
       await this.initializeGlobalRoot();
 
-      // 初始化系统配置账户
+      // Initialize system configuration account
       await this.initializeSystemConfig();
 
-      // 初始化支付系统
+      // Initialize payment system
       await this.initializePaymentSystem();
 
-      // 初始化订单统计系统
+      // Initialize order statistics system
       await this.initializeOrderStats();
 
-      // 初始化程序Token账户
+      // Initialize program Token account
       await this.initializeProgramTokenAccount();
 
-      console.log(`   ✅ 系统初始化完成`);
+      console.log(`   ✅ System initialization completed`);
     } catch (error) {
-      console.error(`   ❌ 系统初始化失败: ${(error as Error).message}`);
+      console.error(`   ❌ System initialization failed: ${(error as Error).message}`);
       throw error;
     }
   }
@@ -539,8 +543,8 @@ export class EnhancedBusinessFlowExecutor {
       // 自动确认收货天数 - 订单发货后多少天自动确认收货
       autoConfirmDays: 7,
 
-      // 外部程序ID - 用于CPI调用add_rewards指令的外部程序地址
-      externalProgramId: new PublicKey("11111111111111111111111111111112"), // 示例外部程序ID
+      // Vault程序ID - 用于CPI调用add_rewards指令的vault程序地址
+      vaultProgramId: new PublicKey("EHiKn3J5wywNG2rHV2Qt74AfNqtJajhPerkVzYXudEwn"), // Vault程序ID
     };
 
     // 调用 initialize_system 指令
@@ -624,8 +628,8 @@ export class EnhancedBusinessFlowExecutor {
       // 自动确认收货天数 - 订单发货后多少天自动确认收货
       autoConfirmDays: 7,
 
-      // 外部程序ID - 用于CPI调用add_rewards指令的外部程序地址
-      externalProgramId: new PublicKey("11111111111111111111111111111112"), // 示例外部程序ID
+      // Vault程序ID - 用于CPI调用add_rewards指令的vault程序地址
+      vaultProgramId: new PublicKey("EHiKn3J5wywNG2rHV2Qt74AfNqtJajhPerkVzYXudEwn"), // Vault程序ID
     };
 
     // 调用 initialize_system_config 指令
@@ -689,16 +693,16 @@ export class EnhancedBusinessFlowExecutor {
       }
     }
 
-    // 创建支持的Token列表 - initialize_payment_system 指令参数
+    // Create supported Token list - initialize_payment_system instruction parameters
     const supportedTokens = [
       {
-        // Token mint地址 - SPL Token的mint账户地址
+        // Token mint address - SPL Token's mint account address
         mint: this.tokenMint!,
 
-        // Token符号 - 用于显示的Token名称（最大10字符）
+        // Token symbol - Token name for display (max 10 characters)
         symbol: this.tokenSymbol,
 
-        // 是否启用 - 控制该Token是否可用于支付
+        // Is enabled - Controls whether this Token is available for payment
         isActive: true,
       },
     ];
@@ -1123,28 +1127,28 @@ export class EnhancedBusinessFlowExecutor {
         }
       }
 
-      console.log(`   ✅ 产品创建流程完成`);
+      console.log(`   ✅ Product creation process completed`);
 
-      // 暂时注释掉基于1.txt的测试用例，因为：
-      // 1. 使用了不存在的商户账户，导致"Attempt to debit an account but found no record of a prior credit"错误
-      // 2. 该测试用例依赖特定的商户密钥对，但该商户可能未注册或资金不足
-      // 3. 为了确保主要业务流程的稳定性，暂时禁用此测试
+      // Temporarily comment out test case based on 1.txt because:
+      // 1. Uses non-existent merchant account, causing "Attempt to debit an account but found no record of a prior credit" error
+      // 2. This test case depends on specific merchant keypair, but the merchant may not be registered or have insufficient funds
+      // 3. To ensure stability of main business flow, temporarily disable this test
       /*
-      console.log(`\n   🧪 执行基于1.txt的产品创建测试用例`);
+      console.log(`\n   🧪 Execute product creation test case based on 1.txt`);
       await this.createProductFrom1txt();
       */
     } catch (error) {
-      console.error(`   ❌ 产品创建失败: ${(error as Error).message}`);
-      console.log(`   ⚠️ 继续执行后续步骤`);
+      console.error(`   ❌ Product creation failed: ${(error as Error).message}`);
+      console.log(`   ⚠️ Continue with subsequent steps`);
     }
   }
 
   /**
-   * 基于1.txt和2.txt文件参数的产品创建和索引创建原子事务
+   * Product creation and index creation atomic transaction based on 1.txt and 2.txt file parameters
    */
   private async createProductFrom1txt(): Promise<void> {
     try {
-      // 使用指定的密钥对作为商户进行签名
+      // Use specified keypair as merchant for signing
       const merchantSecretKey = new Uint8Array([
         163, 102, 82, 217, 30, 33, 157, 187, 209, 192, 175, 148, 135, 163, 153, 210, 42, 98, 169,
         69, 179, 143, 224, 208, 158, 129, 45, 65, 63, 103, 182, 202, 79, 11, 70, 140, 226, 3, 28,
@@ -1154,19 +1158,21 @@ export class EnhancedBusinessFlowExecutor {
       const merchantKeypair = Keypair.fromSecretKey(merchantSecretKey);
       const merchantPubkey = merchantKeypair.publicKey;
 
-      console.log(`   📋 基于1.txt和2.txt文件的产品创建和索引原子事务:`);
-      console.log(`   🔑 使用1.txt指定的商户密钥对:`);
-      console.log(`   🔑 商户地址: ${merchantPubkey.toString()}`);
-      console.log(`   ✅ 这是1.txt中指定的商户密钥对`);
+      console.log(
+        `   📋 Product creation and index atomic transaction based on 1.txt and 2.txt files:`
+      );
+      console.log(`   🔑 Using merchant keypair specified in 1.txt:`);
+      console.log(`   🔑 Merchant address: ${merchantPubkey.toString()}`);
+      console.log(`   ✅ This is the merchant keypair specified in 1.txt`);
 
-      // 基于1.txt解析的参数
+      // Parameters parsed from 1.txt
       const productData = {
         name: "经常你才能想你",
         description: "坚持坚持闹闹",
         price: new anchor.BN("2366000000000"), // lamports
         keywords: ["Digital Camera"],
         inventory: new anchor.BN("6699"),
-        paymentToken: this.tokenMint!, // 使用当前系统的Token
+        paymentToken: this.tokenMint!, // Use current system's Token
         shippingLocation: "Default Shipping Location",
       };
 
@@ -1358,23 +1364,25 @@ export class EnhancedBusinessFlowExecutor {
         console.log(`   ⚠️ 销量索引指令添加失败，跳过: ${(error as Error).message}`);
       }
 
-      // 执行原子事务
-      console.log(`   🚀 执行包含${transaction.instructions.length}个指令的原子事务...`);
+      // Execute atomic transaction
+      console.log(
+        `   🚀 Executing atomic transaction with ${transaction.instructions.length} instructions...`
+      );
       const signature = await this.connection.sendTransaction(transaction, [merchantKeypair]);
       await this.connection.confirmTransaction(signature);
 
-      console.log(`   ✅ 基于1.txt和2.txt的原子事务执行成功！`);
-      console.log(`   📝 交易签名: ${signature}`);
-      console.log(`   📦 产品账户: ${productAccountPDA.toString()}`);
-      console.log(`   🆔 产品ID: ${nextProductId}`);
-      console.log(`   🔗 所有索引（关键词、价格、销量）已在同一事务中创建`);
+      console.log(`   ✅ Atomic transaction based on 1.txt and 2.txt executed successfully!`);
+      console.log(`   📝 Transaction signature: ${signature}`);
+      console.log(`   📦 Product account: ${productAccountPDA.toString()}`);
+      console.log(`   🆔 Product ID: ${nextProductId}`);
+      console.log(`   🔗 All indexes (keyword, price, sales) created in the same transaction`);
 
-      // 保存到创建的产品列表
+      // Save to created products list
       this.createdProducts.push(productAccountPDA);
       this.createdProductIds.push(nextProductId);
     } catch (error) {
-      console.error(`   ❌ 基于1.txt的产品创建失败: ${(error as Error).message}`);
-      console.log(`   ⚠️ 继续执行后续步骤`);
+      console.error(`   ❌ Product creation based on 1.txt failed: ${(error as Error).message}`);
+      console.log(`   ⚠️ Continue with subsequent steps`);
     }
   }
 
@@ -2337,24 +2345,24 @@ export class EnhancedBusinessFlowExecutor {
       const signature = await this.program.methods
         .updateProduct(
           new anchor.BN(productId),
-          "MacBook Pro M3 Max", // 新名称
-          "最新款MacBook Pro，搭载M3 Max芯片，性能更强劲，支持专业级创作", // 新描述
-          null, // 价格不变
-          ["电脑", "苹果", "MacBook"], // 新关键词（限制3个）
-          null, // 库存不变
-          null, // 支付Token不变
-          // ⭐ 更新扩展字段：图片视频URL
+          "MacBook Pro M3 Max", // New name
+          "Latest MacBook Pro with M3 Max chip, more powerful performance, supports professional creation", // New description
+          null, // Price unchanged
+          ["computer", "apple", "MacBook"], // New keywords (limited to 3)
+          null, // Inventory unchanged
+          null, // Payment Token unchanged
+          // ⭐ Update extended fields: image video URLs
           [
             "https://example.com/macbook-pro-m3-1.jpg",
             "https://example.com/macbook-pro-m3-2.jpg",
             "https://example.com/macbook-pro-m3-video.mp4",
             "https://example.com/macbook-pro-m3-3.jpg",
           ],
-          "深圳市南山区科技园", // 新发货地点
-          // ⭐ 更新扩展字段：销售区域
-          ["中国大陆", "港澳台", "新加坡", "马来西亚", "日本"],
-          // ⭐ 更新扩展字段：物流方式
-          ["顺丰快递", "京东物流", "DHL国际", "FedEx", "EMS"]
+          "Shenzhen Nanshan Technology Park", // New shipping location
+          // ⭐ Update extended fields: sales regions
+          ["Mainland China", "Hong Kong, Macao and Taiwan", "Singapore", "Malaysia", "Japan"],
+          // ⭐ Update extended fields: logistics methods
+          ["SF Express", "JD Logistics", "DHL International", "FedEx", "EMS"]
         )
         .accounts({
           merchant: this.merchantKeypair.publicKey,
@@ -2433,12 +2441,11 @@ export class EnhancedBusinessFlowExecutor {
         merchantKeypair.publicKey.toBuffer(),
       ]);
 
+      // 使用新的3元素PDA种子结构
       const [orderPDA] = this.calculatePDA([
-        "order",
+        "buyer_order",
         buyerKeypair.publicKey.toBuffer(),
-        merchantPDA.toBuffer(), // ← 修复：使用商户PDA
-        Buffer.from(new anchor.BN(productId).toArray("le", 8)),
-        Buffer.from(new anchor.BN(currentPurchaseCount).toArray("le", 8)),
+        new anchor.BN(currentPurchaseCount + 1).toArrayLike(Buffer, "le", 8),
       ]);
 
       console.log(`   🔑 计算的订单PDA: ${orderPDA.toString()}`);
@@ -2455,7 +2462,34 @@ export class EnhancedBusinessFlowExecutor {
 
       const [orderStatsPDA] = this.calculatePDA(["order_stats"]);
 
-      // 创建订单创建指令
+      // 计算商户订单相关的PDA
+      const [merchantOrderCountPDA] = this.calculatePDA([
+        "merchant_order_count",
+        merchantKeypair.publicKey.toBuffer(),
+      ]);
+
+      // 获取商户订单计数
+      let merchantOrderCount = 0;
+      try {
+        const merchantOrderCountAccount = await this.program.account.merchantOrderCount.fetch(
+          merchantOrderCountPDA
+        );
+        merchantOrderCount = merchantOrderCountAccount.totalOrders.toNumber();
+      } catch (error) {
+        // 账户不存在，首次创建商户订单
+        merchantOrderCount = 0;
+      }
+
+      const [merchantOrderPDA] = this.calculatePDA([
+        "merchant_order",
+        merchantKeypair.publicKey.toBuffer(),
+        new anchor.BN(merchantOrderCount + 1).toArrayLike(Buffer, "le", 8),
+      ]);
+
+      console.log(`   🏪 商户订单PDA: ${merchantOrderPDA.toString()}`);
+      console.log(`   📊 商户订单序列号: ${merchantOrderCount + 1}`);
+
+      // 1. 创建买家订单指令
       const createOrderInstruction = await this.program.methods
         .createOrder(
           new anchor.BN(productId),
@@ -2475,7 +2509,22 @@ export class EnhancedBusinessFlowExecutor {
         } as any)
         .instruction();
 
-      // 2. 准备支付指令的账户
+      // 2. 创建商户订单指令（引用买家订单PDA）
+      const createMerchantOrderInstruction = await this.program.methods
+        .createMerchantOrder(
+          orderPDA, // buyer_order_pda
+          new anchor.BN(productId)
+        )
+        .accounts({
+          merchantOrderCount: merchantOrderCountPDA,
+          merchantOrder: merchantOrderPDA,
+          merchant: merchantPDA,
+          authority: buyerKeypair.publicKey, // 买家作为权限账户
+          systemProgram: SystemProgram.programId,
+        } as any)
+        .instruction();
+
+      // 3. 准备支付指令的账户
       const [programTokenAccountPDA] = this.calculatePDA([
         "program_token_account",
         this.tokenMint!.toBuffer(),
@@ -2500,11 +2549,15 @@ export class EnhancedBusinessFlowExecutor {
         } as any)
         .instruction();
 
-      // 3. 将两个指令添加到同一个交易中
+      // 4. 将三个指令添加到同一个交易中（原子性）
       transaction.add(createOrderInstruction);
+      transaction.add(createMerchantOrderInstruction);
       transaction.add(paymentInstruction);
 
       console.log(`   ⚡ 执行原子交易（包含 ${transaction.instructions.length} 个指令）...`);
+      console.log(`   📦 买家订单PDA: ${orderPDA.toString()}`);
+      console.log(`   🏪 商户订单PDA: ${merchantOrderPDA.toString()}`);
+      console.log(`   🔗 三指令原子执行: 1.创建买家订单 + 2.创建商户订单 + 3.Token支付`);
 
       // 4. 执行原子交易
       const signature = await sendAndConfirmTransaction(
@@ -2542,15 +2595,13 @@ export class EnhancedBusinessFlowExecutor {
     console.log("\n🔍 PDA种子组件详细调试:");
     console.log("=====================================");
 
-    // 1. 检查每个种子组件
-    const seed1 = Buffer.from("order", "utf8");
+    // 新的3元素种子结构
+    const seed1 = Buffer.from("buyer_order", "utf8");
     const seed2 = buyerKey.toBuffer();
-    const seed3 = merchantKey.toBuffer();
-    const seed4 = Buffer.from(new anchor.BN(productId).toArray("le", 8));
-    const seed5 = Buffer.from(new anchor.BN(purchaseCount).toArray("le", 8));
+    const seed3 = Buffer.from(new anchor.BN(purchaseCount + 1).toArray("le", 8));
 
     console.log(
-      `   🔤 种子1 (order): "${seed1.toString()}" | hex: ${seed1.toString("hex")} | 长度: ${
+      `   🔤 种子1 (buyer_order): "${seed1.toString()}" | hex: ${seed1.toString("hex")} | 长度: ${
         seed1.length
       }`
     );
@@ -2560,25 +2611,15 @@ export class EnhancedBusinessFlowExecutor {
       }`
     );
     console.log(
-      `   🏪 种子3 (merchant): ${merchantKey.toString()} | hex: ${seed3.toString("hex")} | 长度: ${
-        seed3.length
-      }`
-    );
-    console.log(
-      `   📦 种子4 (product_id): ${productId} | hex: ${seed4.toString("hex")} | 长度: ${
-        seed4.length
-      }`
-    );
-    console.log(
-      `   📊 种子5 (purchase_count): ${purchaseCount} | hex: ${seed5.toString("hex")} | 长度: ${
-        seed5.length
-      }`
+      `   📊 种子3 (purchase_count+1): ${purchaseCount + 1} | hex: ${seed3.toString(
+        "hex"
+      )} | 长度: ${seed3.length}`
     );
 
-    // 2. 手动计算PDA
+    // 2. 手动计算PDA（新的3元素结构）
     console.log("\n🔧 手动PDA计算:");
     const [manualPDA, bump] = PublicKey.findProgramAddressSync(
-      [seed1, seed2, seed3, seed4, seed5],
+      [seed1, seed2, seed3],
       this.program.programId
     );
 
@@ -2586,13 +2627,11 @@ export class EnhancedBusinessFlowExecutor {
     console.log(`   🎯 Bump: ${bump}`);
     console.log(`   🏗️ 程序ID: ${this.program.programId.toString()}`);
 
-    // 3. 对比结果
+    // 3. 对比结果（新的3元素结构）
     const [utilityPDA] = this.calculatePDA([
-      "order",
+      "buyer_order",
       buyerKey.toBuffer(),
-      merchantKey.toBuffer(),
-      Buffer.from(new anchor.BN(productId).toArray("le", 8)),
-      Buffer.from(new anchor.BN(purchaseCount).toArray("le", 8)),
+      new anchor.BN(purchaseCount + 1).toArrayLike(Buffer, "le", 8),
     ]);
 
     console.log("\n📊 PDA计算对比:");
@@ -2792,43 +2831,6 @@ export class EnhancedBusinessFlowExecutor {
 
             // 保存订单信息
             this.purchaseEscrowAccount = atomicPurchaseResult.orderAccount;
-
-            console.log(`   � 执行Token支付转移...`);
-            try {
-              const [programTokenAccountPDA] = this.calculatePDA([
-                "program_token_account",
-                this.tokenMint!.toBuffer(),
-              ]);
-              const [programAuthorityPDA] = this.calculatePDA(["program_authority"]);
-
-              const paymentSignature = await this.program.methods
-                .purchaseProductEscrow(
-                  new anchor.BN(productId),
-                  new anchor.BN(1) // 购买数量
-                )
-                .accounts({
-                  buyer: this.buyerKeypair.publicKey,
-                  product: productAccount,
-                  programTokenAccount: programTokenAccountPDA,
-                  programAuthority: programAuthorityPDA,
-                  paymentTokenMint: this.tokenMint!,
-                  buyerTokenAccount: this.buyerTokenAccount!,
-                  tokenProgram: TOKEN_PROGRAM_ID,
-                  systemProgram: SystemProgram.programId,
-                } as any)
-                .signers([this.buyerKeypair])
-                .rpc();
-
-              await this.connection.confirmTransaction(paymentSignature);
-
-              console.log(`   ✅ Token支付成功！`);
-              console.log(`   📝 支付交易签名: ${paymentSignature}`);
-              console.log(`   💰 ${this.formatTokenAmount(productPrice)} 已转入程序托管账户`);
-              console.log(`   🛍️ 订单状态: 已支付，等待发货`);
-            } catch (paymentError) {
-              console.log(`   ⚠️ Token支付失败: ${(paymentError as Error).message}`);
-              console.log(`   💸 订单已创建但支付未完成`);
-            }
           } else {
             console.log(`   ❌ 原子购买交易失败: ${atomicPurchaseResult.error}`);
             console.log(
@@ -2863,15 +2865,13 @@ export class EnhancedBusinessFlowExecutor {
 
       console.log(`   ✅ 买家创建和购买流程完成！`);
 
-      // 如果有实际创建的产品，继续发货和确认流程
-      if (this.createdProducts.length > 0) {
-        await this.step6_merchantShipping();
-
-        // 强制执行退货流程来测试 request_refund 指令
-        console.log(`\n🔄 分支流程：买家选择退货（测试 request_refund 指令）`);
-        await this.step7_buyerReturnProduct();
-        await this.step8_merchantProcessReturn();
-      }
+      // 购买完成，等待后续操作（发货或退款）
+      // 注释掉自动发货逻辑，让退款在发货前进行
+      // if (this.createdProducts.length > 0) {
+      //   await this.step6_merchantShipping();
+      //   await this.step7_buyerReturnProduct();
+      //   await this.step8_merchantProcessReturn();
+      // }
     } catch (error) {
       console.error(`   ❌ 买家创建和购买失败: ${(error as Error).message}`);
       throw error;
@@ -2881,7 +2881,7 @@ export class EnhancedBusinessFlowExecutor {
   /**
    * 步骤6: 商户发货并提交发货单号
    */
-  async step6_merchantShipping(): Promise<void> {
+  async step6_merchantShipping(purchaseCount: number = 0): Promise<void> {
     console.log("\n🚚 步骤6: 商户发货并提交发货单号");
     console.log("==================================================");
 
@@ -2906,21 +2906,16 @@ export class EnhancedBusinessFlowExecutor {
           Buffer.from(this.merchantKeypair.publicKey.toBytes()),
         ]);
 
-        // 计算订单PDA（必须与创建订单时使用相同的种子）
-        // 根据order.rs中的定义：buyer.key(), merchant.key(), product_id, purchase_count
-        // 注意：这里的merchant.key()指的是商户账户PDA，不是商户个人公钥
+        // 计算订单PDA（使用新的3元素种子结构）
+        // 新的种子结构：["buyer_order", buyer.key(), purchase_count+1]
         console.log(`\n🔍 发货时PDA种子调试:`);
         console.log(`   👤 买家: ${this.buyerKeypair.publicKey.toString()}`);
-        console.log(`   🏪 商户PDA: ${merchantInfoPDA.toString()}`);
-        console.log(`   📦 产品ID: ${this.createdProductIds[0]}`);
-        console.log(`   📊 购买计数: 0`);
+        console.log(`   📊 购买计数+1: ${purchaseCount + 1}`);
 
         const [orderPDA] = this.calculatePDA([
-          "order",
+          "buyer_order",
           Buffer.from(this.buyerKeypair.publicKey.toBytes()),
-          Buffer.from(merchantInfoPDA.toBytes()), // 使用商户账户PDA
-          new anchor.BN(this.createdProductIds[0]).toArrayLike(Buffer, "le", 8),
-          new anchor.BN(0).toArrayLike(Buffer, "le", 8), // purchase_count = 0（首次购买）
+          new anchor.BN(purchaseCount + 1).toArrayLike(Buffer, "le", 8),
         ]);
 
         console.log(`   🔑 计算的订单PDA: ${orderPDA.toString()}`);
@@ -2975,6 +2970,172 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
+   * 执行购买指令（用于第二次购买）
+   */
+  private async executePurchase(
+    buyer: PublicKey,
+    merchantKey: PublicKey,
+    productId: number,
+    purchaseCount: number
+  ): Promise<void> {
+    if (!this.buyerKeypair || !this.buyerTokenAccount) {
+      throw new Error("买家密钥对或Token账户未初始化");
+    }
+
+    console.log(`   📦 购买产品ID: ${productId}`);
+    console.log(`   📊 购买计数: ${purchaseCount}`);
+    console.log(`   👤 买家: ${buyer.toString()}`);
+    console.log(`   🏪 商户: ${merchantKey.toString()}`);
+
+    // 计算订单PDA（使用新的3元素种子结构）
+    const [orderPDA] = this.calculatePDA([
+      "buyer_order",
+      buyer.toBuffer(),
+      new anchor.BN(purchaseCount + 1).toArrayLike(Buffer, "le", 8),
+    ]);
+
+    console.log(`   🔑 计算的订单PDA: ${orderPDA.toString()}`);
+
+    // 获取产品账户地址
+    const productAccountIndex = this.createdProductIds.findIndex((id) => id === productId);
+    if (productAccountIndex === -1) {
+      throw new Error(`找不到产品ID ${productId} 的信息`);
+    }
+
+    const productAccountPDA = this.createdProducts[productAccountIndex];
+    const productPrice = this.BUSINESS_CONFIG.PRODUCTS[productAccountIndex].price * Math.pow(10, 9); // 转换为lamports
+    console.log(`   💰 产品价格: ${this.formatTokenAmount(productPrice / Math.pow(10, 9))}`);
+
+    // 构建原子购买交易（使用原子交易方法）
+    const atomicResult = await this.executeAtomicPurchase(
+      productId,
+      productAccountPDA,
+      productPrice,
+      this.buyerKeypair,
+      this.merchantKeypair!
+    );
+
+    if (atomicResult.success) {
+      console.log(`   ✅ 原子购买交易成功！交易签名: ${atomicResult.signature}`);
+      console.log(`   🔒 订单账户: ${orderPDA.toString()}`);
+      console.log(
+        `   💰 ${this.formatTokenAmount(productPrice / Math.pow(10, 9))} TOKEN 已转入程序托管账户`
+      );
+      console.log(`   🛍️ 订单状态: 已支付，等待发货`);
+    } else {
+      throw new Error(`原子购买交易失败: ${atomicResult.error}`);
+    }
+  }
+
+  /**
+   * 执行确认收货指令
+   */
+  private async executeConfirmDelivery(
+    buyer: PublicKey,
+    purchaseCount: number
+  ): Promise<{ success: boolean; signature?: string; error?: string }> {
+    try {
+      if (!this.buyerKeypair) {
+        throw new Error("买家密钥对未初始化");
+      }
+
+      console.log(`\n📦 执行确认收货指令...`);
+      console.log(`   👤 买家: ${buyer.toString()}`);
+      console.log(`   📊 购买计数: ${purchaseCount}`);
+
+      // 计算订单PDA（使用新的3元素种子结构）
+      const [orderPDA] = this.calculatePDA([
+        "buyer_order",
+        buyer.toBuffer(),
+        new anchor.BN(purchaseCount + 1).toArrayLike(Buffer, "le", 8),
+      ]);
+
+      console.log(`   🔑 订单PDA: ${orderPDA.toString()}`);
+
+      // 验证订单账户存在
+      const orderAccount = await this.connection.getAccountInfo(orderPDA);
+      if (!orderAccount) {
+        throw new Error(`订单账户不存在: ${orderPDA.toString()}`);
+      }
+
+      console.log(`   ✅ 订单账户存在，大小: ${orderAccount.data.length} bytes`);
+
+      // 计算其他必需的PDA
+      const [orderStatsPDA] = this.calculatePDA(["order_stats"]);
+
+      // 从订单账户获取商户信息
+      const orderAccountInfo = await this.connection.getAccountInfo(orderPDA);
+      if (!orderAccountInfo) {
+        throw new Error(`订单账户不存在: ${orderPDA.toString()}`);
+      }
+
+      // 解析订单数据获取商户公钥
+      let orderData: any;
+      let merchantPubkey: PublicKey;
+
+      try {
+        orderData = this.program.coder.accounts.decode("Order", orderAccountInfo.data);
+        merchantPubkey = orderData.merchant;
+        console.log(`   📋 订单数据解析成功`);
+        console.log(`   🏪 订单中的商户: ${merchantPubkey.toString()}`);
+        console.log(`   📊 订单状态: ${orderData.status}`);
+      } catch (error) {
+        console.error(`   ❌ 订单数据解析失败: ${(error as Error).message}`);
+        // 使用测试脚本中的商户公钥作为备选
+        merchantPubkey = this.merchantKeypair!.publicKey;
+        console.log(`   🔄 使用备选商户公钥: ${merchantPubkey.toString()}`);
+      }
+
+      const [merchantInfoPDA] = this.calculatePDA(["merchant_info", merchantPubkey.toBuffer()]);
+      const [systemConfigPDA] = this.calculatePDA(["system_config"]);
+      const [depositEscrowPDA] = this.calculatePDA(["deposit_escrow", this.tokenMint!.toBuffer()]);
+      const [programTokenAccountPDA] = this.calculatePDA([
+        "program_token_account",
+        this.tokenMint!.toBuffer(),
+      ]);
+      const [programAuthorityPDA] = this.calculatePDA(["program_authority"]);
+
+      console.log(`   🏪 商户公钥: ${merchantPubkey.toString()}`);
+      console.log(`   🏪 商户信息PDA: ${merchantInfoPDA.toString()}`);
+
+      // 执行确认收货指令（添加System Program账户）
+      const signature = await this.program.methods
+        .confirmDelivery()
+        .accounts({
+          order: orderPDA,
+          orderStats: orderStatsPDA,
+          merchantInfo: merchantInfoPDA,
+          systemConfig: systemConfigPDA,
+          depositEscrowAccount: depositEscrowPDA,
+          programTokenAccount: programTokenAccountPDA,
+          programAuthority: programAuthorityPDA,
+          buyer: buyer,
+          tokenProgram: TOKEN_PROGRAM_ID,
+          systemProgram: anchor.web3.SystemProgram.programId,
+        } as any)
+        .signers([this.buyerKeypair])
+        .rpc();
+
+      await this.connection.confirmTransaction(signature);
+
+      console.log(`   ✅ 确认收货成功！`);
+      console.log(`   📝 确认收货交易签名: ${signature}`);
+      console.log(`   📝 确认时间: ${new Date().toLocaleString("zh-CN")}`);
+
+      return {
+        success: true,
+        signature,
+      };
+    } catch (error) {
+      console.error(`   ❌ 确认收货失败: ${(error as Error).message}`);
+      return {
+        success: false,
+        error: (error as Error).message,
+      };
+    }
+  }
+
+  /**
    * 执行退款指令（使用 request_refund）
    */
   private async executeRequestRefund(
@@ -2990,17 +3151,15 @@ export class EnhancedBusinessFlowExecutor {
       // 计算商户信息PDA
       const [merchantInfoPDA] = this.calculatePDA(["merchant_info", merchantKey.toBuffer()]);
 
-      // 计算订单PDA（需要与创建时相同的种子）
-      // seeds: [b"order", buyer.key(), merchant.key(), product_id, purchase_count]
+      // 计算订单PDA（使用新的3元素种子结构）
+      // seeds: [b"buyer_order", buyer.key(), purchase_count+1]
       const [orderPDA] = this.calculatePDA([
-        "order",
+        "buyer_order",
         buyer.toBuffer(),
-        merchantKey.toBuffer(), // 使用商户个人公钥，不是merchantInfoPDA
-        Buffer.from(new anchor.BN(productId).toArray("le", 8)),
-        Buffer.from(new anchor.BN(0).toArray("le", 8)), // 用户购买计数，第一次购买为0
+        new anchor.BN(1).toArrayLike(Buffer, "le", 8), // 用户购买计数+1，第一次购买为1
       ]);
 
-      // 计算程序Token账户PDA
+      // 计算程序Token账户PDA（使用与初始化指令一致的2个种子元素）
       const [programTokenAccountPDA] = this.calculatePDA([
         "program_token_account",
         this.tokenMint!.toBuffer(),
@@ -3017,6 +3176,7 @@ export class EnhancedBusinessFlowExecutor {
           programTokenAccount: programTokenAccountPDA,
           buyerTokenAccount: this.buyerTokenAccount!,
           programAuthority: programAuthorityPDA,
+          paymentTokenMint: this.tokenMint!,
           buyer: buyer,
           tokenProgram: TOKEN_PROGRAM_ID,
         } as any)
@@ -3342,20 +3502,87 @@ export class EnhancedBusinessFlowExecutor {
       await this.step4_setupSearch();
       await this.step5_createBuyerAndPurchase();
 
-      // 最后回收SOL到主钱包
+      // 实现双分支测试流程：买家购买两次商品
+      console.log("\n🔄 双分支测试流程：买家购买两次商品");
+      console.log("   📦 第一次购买：测试退款分支流程");
+      console.log("   📦 第二次购买：测试确认收货分支流程");
+
+      // 分支流程1：第一次购买 → 申请退款
+      console.log("\n🔄 分支流程1：第一次购买 → 申请退款");
+      try {
+        const refundResult = await this.executeRequestRefund(
+          this.buyerKeypair!.publicKey,
+          this.merchantKeypair!.publicKey,
+          this.createdProductIds[0],
+          "买家在发货前申请退款"
+        );
+
+        if (refundResult.success) {
+          console.log(`   ✅ 第一次购买退款成功！交易签名: ${refundResult.signature}`);
+        } else {
+          console.log(`   ⚠️ 第一次购买退款失败: ${refundResult.error}`);
+        }
+      } catch (error) {
+        console.error(`   ❌ 第一次购买退款执行异常: ${(error as Error).message}`);
+      }
+
+      // 分支流程2：第二次购买 → 发货 → 确认收货
+      console.log("\n🔄 分支流程2：第二次购买 → 发货 → 确认收货");
+
+      // 第二次购买
+      console.log("\n🛒 执行第二次购买...");
+      try {
+        await this.executePurchase(
+          this.buyerKeypair!.publicKey,
+          this.merchantKeypair!.publicKey,
+          this.createdProductIds[0],
+          1 // 第二次购买，购买计数为1
+        );
+        console.log(`   ✅ 第二次购买成功！`);
+      } catch (error) {
+        console.error(`   ❌ 第二次购买失败: ${(error as Error).message}`);
+        return;
+      }
+
+      // 步骤6: 商户发货（针对第二次购买）
+      console.log("\n🚚 步骤6: 商户发货（针对第二次购买）");
+      try {
+        await this.step6_merchantShipping(1); // 传递购买计数
+      } catch (error) {
+        console.error(`   ❌ 发货失败: ${(error as Error).message}`);
+      }
+
+      // 步骤7: 买家确认收货（针对第二次购买）
+      console.log("\n📦 步骤7: 买家确认收货（针对第二次购买）");
+      try {
+        const confirmResult = await this.executeConfirmDelivery(
+          this.buyerKeypair!.publicKey,
+          1 // 第二次购买，购买计数为1
+        );
+
+        if (confirmResult.success) {
+          console.log(`   ✅ 第二次购买确认收货成功！交易签名: ${confirmResult.signature}`);
+        } else {
+          console.log(`   ⚠️ 第二次购买确认收货失败: ${confirmResult.error}`);
+        }
+      } catch (error) {
+        console.error(`   ❌ 第二次购买确认收货执行异常: ${(error as Error).message}`);
+      }
+
+      // Finally reclaim SOL to main wallet
       await this.step9_reclaimSOL();
 
       const executionTime = Date.now() - startTime;
-      console.log("\n🎉 完整业务流程执行完成！");
-      console.log(`⏱️ 总执行时间: ${executionTime}ms`);
+      console.log("\n🎉 Complete business flow execution completed!");
+      console.log(`⏱️ Total execution time: ${executionTime}ms`);
       console.log(
         "================================================================================"
       );
 
-      // 生成简单的执行报告
+      // Generate simple execution report
       this.generateSimpleReport(executionTime);
     } catch (error) {
-      console.error(`❌ 完整业务流程执行失败: ${(error as Error).message}`);
+      console.error(`❌ Complete business flow execution failed: ${(error as Error).message}`);
       throw error;
     }
   }

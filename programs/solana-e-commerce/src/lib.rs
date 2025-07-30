@@ -14,12 +14,12 @@ declare_id!("5XZ74thixMBX2tQN9P3yLTugUK4YMdRLznDNa2mRdGNT");
 pub mod solana_e_commerce {
     use super::*;
 
-    // 系统初始化
+    // System initialization
     pub fn initialize_system(ctx: Context<InitializeSystem>, config: SystemConfig) -> Result<()> {
         instructions::initialize::initialize_system(ctx, config)
     }
 
-    // 系统配置初始化
+    // System configuration initialization
     pub fn initialize_system_config(
         ctx: Context<InitializeSystemConfig>,
         config: SystemConfig,
@@ -27,17 +27,17 @@ pub mod solana_e_commerce {
         instructions::initialize::initialize_system_config(ctx, config)
     }
 
-    // 关闭系统配置
+    // Close system configuration
     pub fn close_system_config(ctx: Context<CloseSystemConfig>, force: bool) -> Result<()> {
         instructions::initialize::close_system_config(ctx, force)
     }
 
-    // 强制关闭不兼容的系统配置账户
+    // Force close incompatible system configuration account
     pub fn force_close_system_config(ctx: Context<ForceCloseSystemConfig>) -> Result<()> {
         instructions::initialize::force_close_system_config(ctx)
     }
 
-    // ID生成器指令
+    // ID generator instructions
     pub fn generate_product_id(ctx: Context<GenerateId>) -> Result<u64> {
         instructions::id_generator::generate_product_id(ctx)
     }
@@ -182,7 +182,7 @@ pub mod solana_e_commerce {
         instructions::product::update_sales_count(ctx, product_id, sales_increment)
     }
 
-    // 支付系统指令
+    // Payment system instructions
     pub fn initialize_payment_system(
         ctx: Context<InitializePaymentSystem>,
         supported_tokens: Vec<SupportedToken>,
@@ -228,7 +228,7 @@ pub mod solana_e_commerce {
         instructions::payment::purchase_product_escrow(ctx, product_id, amount)
     }
 
-    // 关键词索引管理指令（已删除老旧函数，只保留if_needed版本）
+    // Keyword index management instructions (removed old functions, only keep if_needed versions)
 
     pub fn remove_product_from_keyword_index(
         ctx: Context<RemoveProductFromKeywordIndex>,
@@ -238,7 +238,7 @@ pub mod solana_e_commerce {
         instructions::keyword_index::remove_product_from_keyword_index(ctx, keyword, product_id)
     }
 
-    // 关键词索引指令
+    // Keyword index instructions
     pub fn initialize_keyword_index(
         ctx: Context<InitializeKeywordIndexIfNeeded>,
         keyword: String,
@@ -264,9 +264,9 @@ pub mod solana_e_commerce {
         instructions::keyword_index::create_keyword_shard(ctx, keyword, shard_index)
     }
 
-    // 价格索引管理指令
+    // Price index management instructions
 
-    // 智能价格索引指令
+    // Smart price index instructions
     pub fn add_product_to_price_index(
         ctx: Context<AddProductToPriceIndex>,
         product_id: u64,
@@ -343,7 +343,7 @@ pub mod solana_e_commerce {
         instructions::sales_index::update_product_sales_index(ctx, product_id, old_sales, new_sales)
     }
 
-    // 账户关闭指令
+    // Account closing instructions
     pub fn close_keyword_root(
         ctx: Context<CloseKeywordRoot>,
         keyword: String,
@@ -401,16 +401,24 @@ pub mod solana_e_commerce {
         )
     }
 
+    pub fn create_merchant_order(
+        ctx: Context<CreateMerchantOrder>,
+        buyer_order_pda: Pubkey,
+        product_id: u64,
+    ) -> Result<()> {
+        instructions::order::create_merchant_order(ctx, buyer_order_pda, product_id)
+    }
+
     pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()> {
         instructions::order::ship_order(ctx, tracking_number)
     }
 
-    // 买家请求退款
+    // Buyer requests refund
     pub fn refund_order(ctx: Context<RefundOrder>, refund_reason: String) -> Result<()> {
         instructions::order::refund_order(ctx, refund_reason)
     }
 
-    // 商家批准退款指令已移除，买家可直接退款
+    // Merchant approve refund instruction removed, buyers can refund directly
 
     pub fn get_order_stats(ctx: Context<GetOrderStats>) -> Result<()> {
         instructions::order::get_order_stats(ctx)
@@ -420,7 +428,7 @@ pub mod solana_e_commerce {
         instructions::order::confirm_delivery(ctx)
     }
 
-    // 自动确认收货（系统调用）
+    // Auto confirm delivery (system call)
     pub fn auto_confirm_delivery(ctx: Context<AutoConfirmDelivery>) -> Result<()> {
         instructions::order::auto_confirm_delivery(ctx)
     }
@@ -456,7 +464,7 @@ pub mod solana_e_commerce {
         instructions::deposit::get_merchant_deposit_info(ctx)
     }
 
-    // 更新保证金要求（系统管理员）
+    // Update deposit requirement (system administrator)
     pub fn update_deposit_requirement(
         ctx: Context<UpdateDepositRequirement>,
         new_requirement: u64,
@@ -467,41 +475,41 @@ pub mod solana_e_commerce {
 
 #[account]
 pub struct SystemConfig {
-    pub authority: Pubkey, // 系统管理员地址
+    pub authority: Pubkey, // System administrator address
     pub max_products_per_shard: u16,
     pub max_keywords_per_product: u8,
     pub chunk_size: u32,
     pub bloom_filter_size: u16,
-    // 保证金配置
-    pub merchant_deposit_required: u64, // 商户保证金要求（以最小单位计算）
-    pub deposit_token_mint: Pubkey,     // 保证金代币mint地址
-    // 新增平台手续费配置
-    pub platform_fee_rate: u16, // 平台手续费率（基点，默认40 = 0.4%）
-    pub platform_fee_recipient: Pubkey, // 平台手续费接收账户
-    // 新增自动确认收货配置
-    pub auto_confirm_days: u32, // 自动确认收货天数（默认30天）
-    // 新增外部程序ID配置
-    pub external_program_id: Pubkey, // 外部程序ID，用于CPI调用add_rewards
+    // Deposit configuration
+    pub merchant_deposit_required: u64, // Merchant deposit requirement (in smallest units)
+    pub deposit_token_mint: Pubkey,     // Deposit token mint address
+    // Platform fee configuration
+    pub platform_fee_rate: u16, // Platform fee rate (basis points, default 40 = 0.4%)
+    pub platform_fee_recipient: Pubkey, // Platform fee recipient account
+    // Auto confirm delivery configuration
+    pub auto_confirm_days: u32, // Auto confirm delivery days (default 30 days)
+    // Vault program ID configuration
+    pub vault_program_id: Pubkey, // Vault program ID for CPI calls to add_rewards
 }
 
 impl Default for SystemConfig {
     fn default() -> Self {
         Self {
-            authority: Pubkey::default(), // 需要在初始化时设置
+            authority: Pubkey::default(), // Needs to be set during initialization
             max_products_per_shard: 100,
             max_keywords_per_product: 10,
             chunk_size: 10_000,
             bloom_filter_size: 256,
-            // 默认保证金配置：基础单位，需要在初始化时根据Token精度动态计算
-            merchant_deposit_required: 1000, // 基础单位，实际使用时需要根据Token精度转换
-            deposit_token_mint: Pubkey::default(), // 需要在初始化时设置
-            // 默认平台手续费配置
-            platform_fee_rate: 40,                     // 0.4% (40基点)
-            platform_fee_recipient: Pubkey::default(), // 需要在初始化时设置
-            // 默认自动确认收货配置
-            auto_confirm_days: 30, // 30天自动确认收货
-            // 默认外部程序ID配置
-            external_program_id: Pubkey::default(), // 需要在初始化时设置
+            // Default deposit configuration: base units, needs dynamic calculation based on Token precision during initialization
+            merchant_deposit_required: 1000, // Base units, needs conversion based on Token precision during actual use
+            deposit_token_mint: Pubkey::default(), // Needs to be set during initialization
+            // Default platform fee configuration
+            platform_fee_rate: 40,                     // 0.4% (40 basis points)
+            platform_fee_recipient: Pubkey::default(), // Needs to be set during initialization
+            // Default auto confirm delivery configuration
+            auto_confirm_days: 30, // 30 days auto confirm delivery
+            // Default vault program ID configuration
+            vault_program_id: Pubkey::default(), // Needs to be set during initialization
         }
     }
 }

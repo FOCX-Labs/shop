@@ -947,37 +947,7 @@
       "accounts": [
         {
           "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "arg",
-                "path": "buyer_key"
-              },
-              {
-                "kind": "arg",
-                "path": "merchant"
-              },
-              {
-                "kind": "arg",
-                "path": "product_id"
-              },
-              {
-                "kind": "arg",
-                "path": "timestamp"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "order_stats",
@@ -1061,7 +1031,42 @@
         },
         {
           "name": "program_token_account",
-          "writable": true
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  103,
+                  114,
+                  97,
+                  109,
+                  95,
+                  116,
+                  111,
+                  107,
+                  101,
+                  110,
+                  95,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "system_config.deposit_token_mint",
+                "account": "SystemConfig"
+              }
+            ]
+          }
         },
         {
           "name": "deposit_escrow_account",
@@ -1086,6 +1091,11 @@
                   111,
                   119
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "system_config.deposit_token_mint",
+                "account": "SystemConfig"
               }
             ]
           }
@@ -1126,6 +1136,10 @@
         {
           "name": "token_program",
           "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -1232,6 +1246,112 @@
       ]
     },
     {
+      "name": "create_merchant_order",
+      "discriminator": [
+        90,
+        106,
+        124,
+        68,
+        78,
+        247,
+        200,
+        193
+      ],
+      "accounts": [
+        {
+          "name": "merchant_order_count",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  111,
+                  114,
+                  100,
+                  101,
+                  114,
+                  95,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_order",
+          "writable": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.owner",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "buyer_order_pda",
+          "type": "pubkey"
+        },
+        {
+          "name": "product_id",
+          "type": "u64"
+        }
+      ]
+    },
+    {
       "name": "create_order",
       "discriminator": [
         141,
@@ -1282,38 +1402,7 @@
         },
         {
           "name": "order",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  111,
-                  114,
-                  100,
-                  101,
-                  114
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "buyer"
-              },
-              {
-                "kind": "account",
-                "path": "merchant"
-              },
-              {
-                "kind": "arg",
-                "path": "product_id"
-              },
-              {
-                "kind": "account",
-                "path": "user_purchase_count.purchase_count",
-                "account": "UserPurchaseCount"
-              }
-            ]
-          }
+          "writable": true
         },
         {
           "name": "order_stats",
@@ -1726,7 +1815,7 @@
         {
           "name": "merchant_owner",
           "docs": [
-            "商户所有者公钥（用于PDA计算）"
+            "Merchant owner public key (for PDA calculation)"
           ]
         },
         {
@@ -3050,6 +3139,10 @@
                   110,
                   116
                 ]
+              },
+              {
+                "kind": "account",
+                "path": "payment_token_mint"
               }
             ]
           }
@@ -3086,6 +3179,9 @@
               }
             ]
           }
+        },
+        {
+          "name": "payment_token_mint"
         },
         {
           "name": "buyer",
@@ -4214,7 +4310,7 @@
         {
           "name": "merchant_owner",
           "docs": [
-            "商户所有者（签名者）"
+            "Merchant owner (signer)"
           ],
           "signer": true
         },
@@ -4374,6 +4470,32 @@
       ]
     },
     {
+      "name": "MerchantOrder",
+      "discriminator": [
+        16,
+        61,
+        224,
+        139,
+        71,
+        59,
+        194,
+        150
+      ]
+    },
+    {
+      "name": "MerchantOrderCount",
+      "discriminator": [
+        23,
+        11,
+        91,
+        49,
+        176,
+        235,
+        87,
+        136
+      ]
+    },
+    {
       "name": "Order",
       "discriminator": [
         134,
@@ -4523,487 +4645,487 @@
     {
       "code": 6000,
       "name": "MissingKeywordAccount",
-      "msg": "缺少关键词账户"
+      "msg": "Missing keyword account"
     },
     {
       "code": 6001,
       "name": "TooManyKeywords",
-      "msg": "关键词数量超出限制"
+      "msg": "Too many keywords"
     },
     {
       "code": 6002,
       "name": "ShardFull",
-      "msg": "分片空间不足"
+      "msg": "Shard space insufficient"
     },
     {
       "code": 6003,
       "name": "IdGenerationFailed",
-      "msg": "ID生成失败"
+      "msg": "ID generation failed"
     },
     {
       "code": 6004,
       "name": "RentCalculationFailed",
-      "msg": "租金计算失败"
+      "msg": "Rent calculation failed"
     },
     {
       "code": 6005,
       "name": "MerchantNotRegistered",
-      "msg": "商户未注册"
+      "msg": "Merchant not registered"
     },
     {
       "code": 6006,
       "name": "IdAlreadyInUse",
-      "msg": "ID已被使用"
+      "msg": "ID already in use"
     },
     {
       "code": 6007,
       "name": "IdNotFound",
-      "msg": "ID不存在"
+      "msg": "ID not found"
     },
     {
       "code": 6008,
       "name": "IdRangeOverflow",
-      "msg": "ID区间超出范围"
+      "msg": "ID range overflow"
     },
     {
       "code": 6009,
       "name": "NoAvailableId",
-      "msg": "无可用ID"
+      "msg": "No available ID"
     },
     {
       "code": 6010,
       "name": "InvalidId",
-      "msg": "无效的ID"
+      "msg": "Invalid ID"
     },
     {
       "code": 6011,
       "name": "IntegerOverflow",
-      "msg": "整数溢出"
+      "msg": "Integer overflow"
     },
     {
       "code": 6012,
       "name": "ProductNotFound",
-      "msg": "商品不存在"
+      "msg": "Product not found"
     },
     {
       "code": 6013,
       "name": "InvalidProduct",
-      "msg": "无效的商品"
+      "msg": "Invalid product"
     },
     {
       "code": 6014,
       "name": "InvalidProductAccount",
-      "msg": "无效的商品账户"
+      "msg": "Invalid product account"
     },
     {
       "code": 6015,
       "name": "InvalidPrice",
-      "msg": "无效的价格"
+      "msg": "Invalid price"
     },
     {
       "code": 6016,
       "name": "InvalidAmount",
-      "msg": "购买数量必须大于0"
+      "msg": "Purchase quantity must be greater than 0"
     },
     {
       "code": 6017,
       "name": "InvalidProductName",
-      "msg": "无效的商品名称"
+      "msg": "Invalid product name"
     },
     {
       "code": 6018,
       "name": "InvalidProductNameLength",
-      "msg": "无效的商品名称长度"
+      "msg": "Invalid product name length"
     },
     {
       "code": 6019,
       "name": "InvalidProductDescription",
-      "msg": "无效的商品描述"
+      "msg": "Invalid product description"
     },
     {
       "code": 6020,
       "name": "InvalidProductDescriptionLength",
-      "msg": "无效的商品描述长度"
+      "msg": "Invalid product description length"
     },
     {
       "code": 6021,
       "name": "TooManyImageUrls",
-      "msg": "图片URL数量过多"
+      "msg": "Too many image URLs"
     },
     {
       "code": 6022,
       "name": "TooManySalesRegions",
-      "msg": "销售区域数量过多"
+      "msg": "Too many sales regions"
     },
     {
       "code": 6023,
       "name": "TooManyLogisticsMethods",
-      "msg": "物流方式数量过多"
+      "msg": "Too many logistics methods"
     },
     {
       "code": 6024,
       "name": "InvalidMerchant",
-      "msg": "无效的商户"
+      "msg": "Invalid merchant"
     },
     {
       "code": 6025,
       "name": "InvalidMerchantNameLength",
-      "msg": "无效的商户名称长度"
+      "msg": "Invalid merchant name length"
     },
     {
       "code": 6026,
       "name": "InvalidMerchantDescriptionLength",
-      "msg": "无效的商户描述长度"
+      "msg": "Invalid merchant description length"
     },
     {
       "code": 6027,
       "name": "UnauthorizedMerchant",
-      "msg": "未授权的商户操作"
+      "msg": "Unauthorized merchant operation"
     },
     {
       "code": 6028,
       "name": "InvalidKeyword",
-      "msg": "无效的关键词"
+      "msg": "Invalid keyword"
     },
     {
       "code": 6029,
       "name": "InvalidKeywordLength",
-      "msg": "无效的关键词长度"
+      "msg": "Invalid keyword length"
     },
     {
       "code": 6030,
       "name": "InvalidKeywordCount",
-      "msg": "无效的关键词数量"
+      "msg": "Invalid keyword count"
     },
     {
       "code": 6031,
       "name": "DuplicateKeyword",
-      "msg": "重复的关键词"
+      "msg": "Duplicate keyword"
     },
     {
       "code": 6032,
       "name": "ShardIsFull",
-      "msg": "分片已满"
+      "msg": "Shard is full"
     },
     {
       "code": 6033,
       "name": "InvalidShardIndex",
-      "msg": "无效的分片索引"
+      "msg": "Invalid shard index"
     },
     {
       "code": 6034,
       "name": "PriceIndexNodeNotFound",
-      "msg": "价格索引节点不存在"
+      "msg": "Price index node not found"
     },
     {
       "code": 6035,
       "name": "SalesIndexNodeNotFound",
-      "msg": "销量索引节点不存在"
+      "msg": "Sales index node not found"
     },
     {
       "code": 6036,
       "name": "InvalidPriceRange",
-      "msg": "无效的价格区间"
+      "msg": "Invalid price range"
     },
     {
       "code": 6037,
       "name": "InvalidSalesRange",
-      "msg": "无效的销量区间"
+      "msg": "Invalid sales range"
     },
     {
       "code": 6038,
       "name": "BloomFilterUpdateFailed",
-      "msg": "布隆过滤器更新失败"
+      "msg": "Bloom filter update failed"
     },
     {
       "code": 6039,
       "name": "KeywordIndexNotEmpty",
-      "msg": "关键词索引不为空"
+      "msg": "Keyword index not empty"
     },
     {
       "code": 6040,
       "name": "KeywordShardNotEmpty",
-      "msg": "关键词分片不为空"
+      "msg": "Keyword shard not empty"
     },
     {
       "code": 6041,
       "name": "MerchantHasActiveProducts",
-      "msg": "商户仍有活跃产品"
+      "msg": "Merchant has active products"
     },
     {
       "code": 6042,
       "name": "IdChunkNotEmpty",
-      "msg": "ID块不为空"
+      "msg": "ID chunk not empty"
     },
     {
       "code": 6043,
       "name": "MerchantIdAccountNotEmpty",
-      "msg": "商户ID账户不为空"
+      "msg": "Merchant ID account not empty"
     },
     {
       "code": 6044,
       "name": "UnsupportedToken",
-      "msg": "不支持的代币"
+      "msg": "Unsupported token"
     },
     {
       "code": 6045,
       "name": "InsufficientTokenBalance",
-      "msg": "代币余额不足"
+      "msg": "Insufficient token balance"
     },
     {
       "code": 6046,
       "name": "InsufficientSolBalance",
-      "msg": "SOL余额不足"
+      "msg": "Insufficient SOL balance"
     },
     {
       "code": 6047,
       "name": "InvalidTokenAmount",
-      "msg": "无效的代币金额"
+      "msg": "Invalid token amount"
     },
     {
       "code": 6048,
       "name": "TokenTransferFailed",
-      "msg": "代币转账失败"
+      "msg": "Token transfer failed"
     },
     {
       "code": 6049,
       "name": "FeeCalculationError",
-      "msg": "手续费计算错误"
+      "msg": "Fee calculation error"
     },
     {
       "code": 6050,
       "name": "PaymentConfigNotFound",
-      "msg": "支付配置未找到"
+      "msg": "Payment config not found"
     },
     {
       "code": 6051,
       "name": "TokenNotActive",
-      "msg": "代币未激活"
+      "msg": "Token not active"
     },
     {
       "code": 6052,
       "name": "BelowMinimumAmount",
-      "msg": "低于最小交易金额"
+      "msg": "Below minimum amount"
     },
     {
       "code": 6053,
       "name": "ProductCreationFailed",
-      "msg": "商品创建失败"
+      "msg": "Product creation failed"
     },
     {
       "code": 6054,
       "name": "AtomicOperationFailed",
-      "msg": "原子操作失败"
+      "msg": "Atomic operation failed"
     },
     {
       "code": 6055,
       "name": "InvalidFeeRate",
-      "msg": "无效的手续费率"
+      "msg": "Invalid fee rate"
     },
     {
       "code": 6056,
       "name": "TooManyTokens",
-      "msg": "代币数量过多"
+      "msg": "Too many tokens"
     },
     {
       "code": 6057,
       "name": "InvalidTokenSymbol",
-      "msg": "无效的代币符号"
+      "msg": "Invalid token symbol"
     },
     {
       "code": 6058,
       "name": "InvalidTokenDecimals",
-      "msg": "无效的代币精度"
+      "msg": "Invalid token decimals"
     },
     {
       "code": 6059,
       "name": "InvalidOrderStatus",
-      "msg": "无效的订单状态"
+      "msg": "Invalid order status"
     },
     {
       "code": 6060,
       "name": "InvalidPaymentMethod",
-      "msg": "无效的支付方式"
+      "msg": "Invalid payment method"
     },
     {
       "code": 6061,
       "name": "OrderNotFound",
-      "msg": "订单不存在"
+      "msg": "Order not found"
     },
     {
       "code": 6062,
       "name": "InvalidOrderQuantity",
-      "msg": "无效的订单数量"
+      "msg": "Invalid order quantity"
     },
     {
       "code": 6063,
       "name": "InvalidOrderPrice",
-      "msg": "无效的订单价格"
+      "msg": "Invalid order price"
     },
     {
       "code": 6064,
       "name": "InvalidOrderTotalAmount",
-      "msg": "无效的订单总金额"
+      "msg": "Invalid order total amount"
     },
     {
       "code": 6065,
       "name": "InvalidOrderTokenPrice",
-      "msg": "无效的订单代币价格"
+      "msg": "Invalid order token price"
     },
     {
       "code": 6066,
       "name": "InvalidOrderTokenTotalAmount",
-      "msg": "无效的订单代币总金额"
+      "msg": "Invalid order token total amount"
     },
     {
       "code": 6067,
       "name": "InvalidShippingAddressLength",
-      "msg": "无效的收货地址长度"
+      "msg": "Invalid shipping address length"
     },
     {
       "code": 6068,
       "name": "InvalidOrderNotesLength",
-      "msg": "无效的订单备注长度"
+      "msg": "Invalid order notes length"
     },
     {
       "code": 6069,
       "name": "InvalidTransactionSignature",
-      "msg": "无效的交易签名"
+      "msg": "Invalid transaction signature"
     },
     {
       "code": 6070,
       "name": "InvalidOrderStatusTransition",
-      "msg": "无效的订单状态转换"
+      "msg": "Invalid order status transition"
     },
     {
       "code": 6071,
       "name": "OrderCannotBeModified",
-      "msg": "订单无法修改"
+      "msg": "Order cannot be modified"
     },
     {
       "code": 6072,
       "name": "OrderCannotBeRefunded",
-      "msg": "订单无法退款"
+      "msg": "Order cannot be refunded"
     },
     {
       "code": 6073,
       "name": "OrderAlreadyExists",
-      "msg": "订单已存在"
+      "msg": "Order already exists"
     },
     {
       "code": 6074,
       "name": "Unauthorized",
-      "msg": "未授权操作"
+      "msg": "Unauthorized operation"
     },
     {
       "code": 6075,
       "name": "InvalidTimestamp",
-      "msg": "无效的时间戳"
+      "msg": "Invalid timestamp"
     },
     {
       "code": 6076,
       "name": "InvalidAccountOwner",
-      "msg": "无效的账户所有者"
+      "msg": "Invalid account owner"
     },
     {
       "code": 6077,
       "name": "InvalidAccountData",
-      "msg": "无效的账户数据"
+      "msg": "Invalid account data"
     },
     {
       "code": 6078,
       "name": "InvalidAccountSize",
-      "msg": "无效的账户大小"
+      "msg": "Invalid account size"
     },
     {
       "code": 6079,
       "name": "InvalidPda",
-      "msg": "无效的PDA"
+      "msg": "Invalid PDA"
     },
     {
       "code": 6080,
       "name": "InvalidAccountSeeds",
-      "msg": "无效的账户种子"
+      "msg": "Invalid account seeds"
     },
     {
       "code": 6081,
       "name": "InvalidAccountBump",
-      "msg": "无效的账户bump"
+      "msg": "Invalid account bump"
     },
     {
       "code": 6082,
       "name": "InsufficientFunds",
-      "msg": "余额不足"
+      "msg": "Insufficient funds"
     },
     {
       "code": 6083,
       "name": "InvalidActiveChunk",
-      "msg": "无效的活跃块"
+      "msg": "Invalid active chunk"
     },
     {
       "code": 6084,
       "name": "AccountDiscriminatorMismatch",
-      "msg": "账户判别器不匹配"
+      "msg": "Account discriminator mismatch"
     },
     {
       "code": 6085,
       "name": "InsufficientAccounts",
-      "msg": "账户数量不足"
+      "msg": "Insufficient accounts"
     },
     {
       "code": 6086,
       "name": "InsufficientDeposit",
-      "msg": "保证金不足"
+      "msg": "Insufficient deposit"
     },
     {
       "code": 6087,
       "name": "InsufficientLockedDeposit",
-      "msg": "锁定保证金不足"
+      "msg": "Insufficient locked deposit"
     },
     {
       "code": 6088,
       "name": "InvalidDepositToken",
-      "msg": "无效的保证金代币"
+      "msg": "Invalid deposit token"
     },
     {
       "code": 6089,
       "name": "InvalidDepositAmount",
-      "msg": "保证金金额无效"
+      "msg": "Invalid deposit amount"
     },
     {
       "code": 6090,
       "name": "MerchantDepositInsufficient",
-      "msg": "商户保证金不足，无法进行交易"
+      "msg": "Merchant deposit insufficient for transaction"
     },
     {
       "code": 6091,
       "name": "DepositAlreadyLocked",
-      "msg": "保证金已锁定"
+      "msg": "Deposit already locked"
     },
     {
       "code": 6092,
       "name": "DepositNotLocked",
-      "msg": "保证金未锁定"
+      "msg": "Deposit not locked"
     },
     {
       "code": 6093,
       "name": "ArithmeticOverflow",
-      "msg": "算术溢出"
+      "msg": "Arithmetic overflow"
     },
     {
       "code": 6094,
       "name": "ArithmeticUnderflow",
-      "msg": "算术下溢"
+      "msg": "Arithmetic underflow"
     },
     {
       "code": 6095,
       "name": "TrackingNumberRequired",
-      "msg": "发货时必须提供物流单号"
+      "msg": "Tracking number required for shipping"
     },
     {
       "code": 6096,
       "name": "InvalidTrackingNumber",
-      "msg": "无效的物流单号"
+      "msg": "Invalid tracking number"
     }
   ],
   "types": [
@@ -5242,7 +5364,7 @@
     {
       "name": "MerchantDepositInfo",
       "docs": [
-        "商户保证金信息结构"
+        "Merchant deposit information structure"
       ],
       "type": {
         "kind": "struct",
@@ -5304,6 +5426,76 @@
             "type": {
               "vec": "pubkey"
             }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantOrder",
+      "docs": [
+        "商家订单账户 - 纯索引功能，用于商家快速查询和定位买家订单"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant_order_sequence",
+            "type": "u64"
+          },
+          {
+            "name": "buyer_order_pda",
+            "type": "pubkey"
+          },
+          {
+            "name": "product_id",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MerchantOrderCount",
+      "docs": [
+        "商家订单计数账户 - 记录商家接收的订单总数，为商家订单提供唯一序列号"
+      ],
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_orders",
+            "type": "u64"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "updated_at",
+            "type": "i64"
           },
           {
             "name": "bump",
@@ -5470,6 +5662,10 @@
           {
             "name": "transaction_signature",
             "type": "string"
+          },
+          {
+            "name": "merchant_order_pda",
+            "type": "pubkey"
           },
           {
             "name": "bump",
@@ -5928,7 +6124,7 @@
             "type": "u32"
           },
           {
-            "name": "external_program_id",
+            "name": "vault_program_id",
             "type": "pubkey"
           }
         ]

@@ -8,7 +8,7 @@ pub struct DeleteProduct<'info> {
     #[account(mut)]
     pub merchant: Signer<'info>,
 
-    // 移除merchant_info账户 - 产品计数统计功能非核心，权限验证通过product.merchant进行
+    // Remove merchant_info account - product count statistics is non-core, permission verification through product.merchant
     #[account(
         mut,
         seeds = [b"product", product_id.to_le_bytes().as_ref()],
@@ -50,10 +50,10 @@ pub struct UpdateProductPrice<'info> {
         constraint = product.merchant == merchant.key() @ ErrorCode::Unauthorized
     )]
     pub product: Account<'info, ProductBase>,
-    // 移除merchant_info账户 - 权限验证通过product.merchant字段进行，无需额外账户
+    // Remove merchant_info account - permission verification through product.merchant field, no additional account needed
 }
 
-/// 创建ProductBase指令 - 只处理核心业务数据
+/// Create ProductBase instruction - only handle core business data
 #[derive(Accounts)]
 #[instruction(
     name: String,
@@ -133,7 +133,7 @@ pub struct CreateProductExtended<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 创建ProductBase函数 - 只创建核心业务数据
+/// Create ProductBase function - only create core business data
 pub fn create_product_base(
     ctx: Context<CreateProductBase>,
     name: String,
@@ -144,7 +144,7 @@ pub fn create_product_base(
     payment_token: Pubkey,
     shipping_location: String,
 ) -> Result<u64> {
-    // 验证输入参数 - 创建时限制为3个关键词（考虑指令账户大小）
+    // Validate input parameters - limit to 3 keywords during creation (considering instruction account size)
     require!(
         keywords.len() <= MAX_KEYWORDS_PER_PRODUCT_CREATE,
         ErrorCode::TooManyKeywords
@@ -152,7 +152,7 @@ pub fn create_product_base(
     require!(keywords.len() > 0, ErrorCode::InvalidKeyword);
     require!(price > 0, ErrorCode::InvalidPrice);
 
-    // 验证支付代币是否被支持
+    // Verify if payment token is supported
     require!(
         ctx.accounts
             .payment_config
@@ -160,13 +160,13 @@ pub fn create_product_base(
         ErrorCode::UnsupportedToken
     );
 
-    // 1. 生成产品ID
+    // 1. Generate product ID
     let product_id = generate_next_product_id(
         &mut ctx.accounts.merchant_id_account,
         &mut ctx.accounts.active_chunk,
     )?;
 
-    // 2. 创建产品账户
+    // 2. Create product account
     create_product_account(
         &ctx.accounts.merchant,
         &ctx.accounts.product_account,
@@ -175,7 +175,7 @@ pub fn create_product_base(
         ctx.program_id,
     )?;
 
-    // 3. 初始化产品基础数据
+    // 3. Initialize product base data
     let product_data = ProductBase {
         id: product_id,
         merchant: ctx.accounts.merchant.key(),
@@ -190,7 +190,7 @@ pub fn create_product_base(
         created_at: Clock::get()?.unix_timestamp,
         updated_at: Clock::get()?.unix_timestamp,
         shipping_location,
-        bump: 0, // 将在后续设置
+        bump: 0, // Will be set later
     };
 
     // 4. 序列化产品数据
@@ -211,7 +211,7 @@ pub fn create_product_base(
     Ok(product_id)
 }
 
-/// 创建ProductExtended函数 - 只创建扩展营销数据
+/// Create ProductExtended function - only create extended marketing data
 pub fn create_product_extended(
     ctx: Context<CreateProductExtended>,
     product_id: u64,
@@ -219,7 +219,7 @@ pub fn create_product_extended(
     sales_regions: Vec<String>,
     logistics_methods: Vec<String>,
 ) -> Result<()> {
-    // 验证输入参数
+    // Validate input parameters
     require!(image_video_urls.len() <= 10, ErrorCode::TooManyImageUrls);
     require!(sales_regions.len() <= 20, ErrorCode::TooManySalesRegions);
     require!(
@@ -227,7 +227,7 @@ pub fn create_product_extended(
         ErrorCode::TooManyLogisticsMethods
     );
 
-    // 初始化ProductExtended数据
+    // Initialize ProductExtended data
     let product_extended_data = ProductExtended {
         product_id,
         image_video_urls: image_video_urls.join(","),
@@ -377,10 +377,10 @@ pub fn delete_product(
     force: bool,
 ) -> Result<()> {
     let product = &ctx.accounts.product;
-    // 移除merchant_info引用 - 统计功能已简化
+    // Remove merchant_info reference - statistics functionality has been simplified
     let product_id = product.id;
 
-    // 权限验证（当force=false时）
+    // Permission verification (when force=false)
     if !force {
         require!(
             product.merchant == ctx.accounts.merchant.key(),
@@ -388,31 +388,35 @@ pub fn delete_product(
         );
     }
 
-    // 记录需要清理的索引信息
+    // Record index information that needs cleanup
     let keywords = product.parse_keywords();
     let price = product.price;
     let sales = product.sales;
 
     if hard_delete {
-        // 硬删除：账户将通过close约束自动关闭并回收租金到beneficiary
-        // 商户统计功能已移除 - 可通过查询链上产品账户获取统计信息
+        // Hard delete: account will be automatically closed and rent reclaimed to beneficiary through close constraint
+        // Merchant statistics functionality removed - can obtain statistics by querying on-chain product accounts
 
         msg!(
-            "商品已硬删除，ID: {}, 强制删除: {}, 租金已回收到受益人",
+            "Product hard deleted, ID: {}, force delete: {}, rent reclaimed to beneficiary",
             product_id,
             force
         );
     } else {
-        // 软删除：标记为非活跃
+        // Soft delete: mark as inactive
         let product = &mut ctx.accounts.product;
         product.set_active(false)?;
 
-        msg!("商品已软删除，ID: {}, 强制删除: {}", product_id, force);
+        msg!(
+            "Product soft deleted, ID: {}, force delete: {}",
+            product_id,
+            force
+        );
     }
 
-    // 索引清理逻辑（需要通过专门的指令执行）
+    // Index cleanup logic (needs to be executed through dedicated instructions)
     msg!(
-        "需要清理的索引信息 - 关键词: {:?}, 价格: {}, 销量: {}",
+        "Index information that needs cleanup - keywords: {:?}, price: {}, sales: {}",
         keywords,
         price,
         sales
@@ -431,7 +435,7 @@ pub fn update_sales_count(
     product.update_sales(sales_increment)?;
 
     msg!(
-        "商品销量更新成功，ID: {}, 增量: {}",
+        "Product sales update successful, ID: {}, increment: {}",
         product.id,
         sales_increment
     );
@@ -469,7 +473,7 @@ pub fn update_product_price(
     Ok(())
 }
 
-// 更新商品信息
+// Update product information
 #[derive(Accounts)]
 #[instruction(product_id: u64)]
 pub struct UpdateProduct<'info> {
@@ -516,25 +520,25 @@ pub fn update_product(
 ) -> Result<()> {
     let product = &mut ctx.accounts.product;
 
-    // 更新名称
+    // Update name
     if let Some(new_name) = name {
         require!(!new_name.is_empty(), ErrorCode::InvalidProductNameLength);
         product.name = new_name;
     }
 
-    // 更新描述
+    // Update description
     if let Some(new_description) = description {
         product.description = new_description;
     }
 
-    // 更新价格
+    // Update price
     if let Some(new_price) = price {
         require!(new_price > 0, ErrorCode::InvalidPrice);
         product.price = new_price;
     }
 
-    // 更新关键词（现在在ProductBase中）
-    // 修改时允许最多10个关键词，创建时限制为3个（考虑指令账户大小）
+    // Update keywords (now in ProductBase)
+    // Allow up to 10 keywords when updating, limit to 3 when creating (considering instruction account size)
     if let Some(new_keywords) = keywords {
         require!(
             new_keywords.len() <= MAX_KEYWORDS_PER_PRODUCT,

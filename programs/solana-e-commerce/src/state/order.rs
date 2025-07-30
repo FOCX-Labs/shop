@@ -43,23 +43,17 @@ pub struct Order {
     pub tracking_number: String, // 物流单号（发货时必填）
     #[max_len(88)]
     pub transaction_signature: String, // 支付交易签名
+    pub merchant_order_pda: Pubkey,    // 关联的商家订单PDA
     pub bump: u8,                      // PDA bump
 }
 
 impl Order {
-    // PDA种子 - 使用买家、商户、产品ID和购买顺序号组合确保唯一性
-    pub fn seeds(
-        buyer: &Pubkey,
-        merchant: &Pubkey,
-        product_id: u64,
-        purchase_count: u64,
-    ) -> Vec<Vec<u8>> {
+    // PDA种子 - 使用买家地址和购买序列号确保唯一性
+    pub fn seeds(buyer: &Pubkey, buyer_purchase_sequence: u64) -> Vec<Vec<u8>> {
         vec![
-            b"order".to_vec(),
+            b"buyer_order".to_vec(),
             buyer.to_bytes().to_vec(),
-            merchant.to_bytes().to_vec(),
-            product_id.to_le_bytes().to_vec(),
-            purchase_count.to_le_bytes().to_vec(),
+            buyer_purchase_sequence.to_le_bytes().to_vec(),
         ]
     }
 
