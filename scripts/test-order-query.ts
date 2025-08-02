@@ -3,18 +3,18 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 import { Connection, PublicKey, Keypair } from "@solana/web3.js";
 import { OrderQueryService } from "./order-query-service";
 
-// 主函数
+// Main function
 async function main() {
-  console.log("🚀 订单查询系统测试开始");
+  console.log("🚀 Order query system test started");
 
-  // 设置连接
+  // Setup connection
   const connection = new Connection(
     "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef",
     "confirmed"
   );
 
-  // 创建钱包和provider
-  const wallet = new anchor.Wallet(Keypair.generate()); // 临时钱包，仅用于查询
+  // Create wallet and provider
+  const wallet = new anchor.Wallet(Keypair.generate()); // Temporary wallet, only for queries
   const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
   });
@@ -23,16 +23,16 @@ async function main() {
   const queryService = new OrderQueryService();
 
   try {
-    // 使用从增强业务流程脚本中获得的实际地址
-    const buyerPublicKey = new PublicKey("3DghDSAbedNuTJJo9eM5VuiykiaUQSfoKkYWAq31YAQS");
-    const merchantPublicKey = new PublicKey("Jeq3FAX7JEZNAdX8SY9M1NW5a43GZKUeRokTH6Mj2eV");
+    // Use actual addresses obtained from enhanced business flow script (updated for new PDA rules)
+    const buyerPublicKey = new PublicKey("E8f76tNTJZPW9AWLedsuresALsrrBVvHHznCLvaqJbFe");
+    const merchantPublicKey = new PublicKey("EqmeCvUSfz3puTw4LdsYNEVMrHn7fuUtDc3REW8LoxTv");
 
-    console.log(`👤 买家地址: ${buyerPublicKey.toString()}`);
-    console.log(`🏪 商户地址: ${merchantPublicKey.toString()}`);
+    console.log(`👤 Buyer address: ${buyerPublicKey.toString()}`);
+    console.log(`🏪 Merchant address: ${merchantPublicKey.toString()}`);
 
-    // 1. 测试买家订单查询
+    // 1. Test buyer order query
     console.log("\n" + "=".repeat(60));
-    console.log("📋 买家订单查询测试");
+    console.log("📋 Buyer Order Query Test");
     console.log("=".repeat(60));
 
     const buyerOrders = await queryService.getBuyerOrders({
@@ -42,32 +42,32 @@ async function main() {
       sortOrder: "desc",
     });
 
-    console.log(`\n📊 买家订单查询结果:`);
-    console.log(`   总订单数: ${buyerOrders.totalCount}`);
-    console.log(`   当前页: ${buyerOrders.page + 1}`);
-    console.log(`   页大小: ${buyerOrders.pageSize}`);
-    console.log(`   有下一页: ${buyerOrders.hasNext ? "是" : "否"}`);
-    console.log(`   有上一页: ${buyerOrders.hasPrev ? "是" : "否"}`);
+    console.log(`\n📊 Buyer order query results:`);
+    console.log(`   Total orders: ${buyerOrders.totalCount}`);
+    console.log(`   Current page: ${buyerOrders.page + 1}`);
+    console.log(`   Page size: ${buyerOrders.pageSize}`);
+    console.log(`   Has next page: ${buyerOrders.hasNext ? "Yes" : "No"}`);
+    console.log(`   Has previous page: ${buyerOrders.hasPrev ? "Yes" : "No"}`);
 
     if (buyerOrders.orders.length > 0) {
       buyerOrders.orders.forEach((order, index) => {
-        console.log(`\n📦 订单 ${index + 1}:`);
-        console.log(`   订单序列号: ${order.buyerSequence}`);
-        console.log(`   商户: ${order.merchant}`);
-        console.log(`   产品ID: ${order.productId}`);
-        console.log(`   数量: ${order.quantity}`);
-        console.log(`   总价: ${order.totalAmount} TOKEN`);
-        console.log(`   状态: ${order.status}`);
-        console.log(`   创建时间: ${new Date(order.createdAt * 1000).toLocaleString()}`);
-        console.log(`   订单PDA: ${order.orderPDA}`);
+        console.log(`\n📦 Order ${index + 1}:`);
+        console.log(`   Order sequence: ${order.buyerSequence}`);
+        console.log(`   Merchant: ${order.merchant}`);
+        console.log(`   Product ID: ${order.productId}`);
+        console.log(`   Quantity: ${order.quantity}`);
+        console.log(`   Total price: ${order.totalAmount} TOKEN`);
+        console.log(`   Status: ${order.status}`);
+        console.log(`   Created at: ${new Date(order.createdAt * 1000).toLocaleString()}`);
+        console.log(`   Order PDA: ${order.orderPDA}`);
       });
     } else {
-      console.log("   📭 暂无订单");
+      console.log("   📭 No orders found");
     }
 
-    // 2. 测试商户订单查询
+    // 2. Test merchant order query
     console.log("\n" + "=".repeat(60));
-    console.log("🏪 商户订单查询测试");
+    console.log("🏪 Merchant Order Query Test");
     console.log("=".repeat(60));
 
     const merchantOrders = await queryService.getMerchantOrders({
@@ -77,34 +77,34 @@ async function main() {
       sortOrder: "desc",
     });
 
-    console.log(`\n📊 商户订单查询结果:`);
-    console.log(`   总订单数: ${merchantOrders.totalCount}`);
-    console.log(`   当前页: ${merchantOrders.page + 1}`);
-    console.log(`   页大小: ${merchantOrders.pageSize}`);
-    console.log(`   有下一页: ${merchantOrders.hasNext ? "是" : "否"}`);
-    console.log(`   有上一页: ${merchantOrders.hasPrev ? "是" : "否"}`);
+    console.log(`\n📊 Merchant order query results:`);
+    console.log(`   Total orders: ${merchantOrders.totalCount}`);
+    console.log(`   Current page: ${merchantOrders.page + 1}`);
+    console.log(`   Page size: ${merchantOrders.pageSize}`);
+    console.log(`   Has next page: ${merchantOrders.hasNext ? "Yes" : "No"}`);
+    console.log(`   Has previous page: ${merchantOrders.hasPrev ? "Yes" : "No"}`);
 
     if (merchantOrders.orders.length > 0) {
       merchantOrders.orders.forEach((order, index) => {
-        console.log(`\n🛍️ 订单 ${index + 1}:`);
-        console.log(`   商户序列号: ${order.merchantSequence}`);
-        console.log(`   买家序列号: ${order.buyerSequence}`);
-        console.log(`   买家: ${order.buyer}`);
-        console.log(`   产品ID: ${order.productId}`);
-        console.log(`   数量: ${order.quantity}`);
-        console.log(`   总价: ${order.totalAmount} TOKEN`);
-        console.log(`   状态: ${order.status}`);
-        console.log(`   创建时间: ${new Date(order.createdAt * 1000).toLocaleString()}`);
-        console.log(`   订单PDA: ${order.orderPDA}`);
+        console.log(`\n🛍️ Order ${index + 1}:`);
+        console.log(`   Merchant sequence: ${order.merchantSequence}`);
+        console.log(`   Buyer sequence: ${order.buyerSequence}`);
+        console.log(`   Buyer: ${order.buyer}`);
+        console.log(`   Product ID: ${order.productId}`);
+        console.log(`   Quantity: ${order.quantity}`);
+        console.log(`   Total price: ${order.totalAmount} TOKEN`);
+        console.log(`   Status: ${order.status}`);
+        console.log(`   Created at: ${new Date(order.createdAt * 1000).toLocaleString()}`);
+        console.log(`   Order PDA: ${order.orderPDA}`);
       });
     } else {
-      console.log("   📭 暂无订单");
+      console.log("   📭 No orders found");
     }
 
-    // 3. 测试分页查询
+    // 3. Test pagination query
     if (buyerOrders.totalCount > 1) {
       console.log("\n" + "=".repeat(60));
-      console.log("📄 分页查询测试");
+      console.log("📄 Pagination Query Test");
       console.log("=".repeat(60));
 
       const page1 = await queryService.getBuyerOrders({
@@ -121,22 +121,22 @@ async function main() {
         sortOrder: "desc",
       });
 
-      console.log(`\n📄 第一页订单:`);
+      console.log(`\n📄 First page orders:`);
       if (page1.orders.length > 0) {
-        console.log(`   订单序列号: ${page1.orders[0].buyerSequence}`);
-        console.log(`   状态: ${page1.orders[0].status}`);
+        console.log(`   Order sequence: ${page1.orders[0].buyerSequence}`);
+        console.log(`   Status: ${page1.orders[0].status}`);
       }
 
-      console.log(`\n📄 第二页订单:`);
+      console.log(`\n📄 Second page orders:`);
       if (page2.orders.length > 0) {
-        console.log(`   订单序列号: ${page2.orders[0].buyerSequence}`);
-        console.log(`   状态: ${page2.orders[0].status}`);
+        console.log(`   Order sequence: ${page2.orders[0].buyerSequence}`);
+        console.log(`   Status: ${page2.orders[0].status}`);
       }
     }
 
-    // 4. 测试排序功能
+    // 4. Test sorting functionality
     console.log("\n" + "=".repeat(60));
-    console.log("🔄 排序功能测试");
+    console.log("🔄 Sorting Functionality Test");
     console.log("=".repeat(60));
 
     const ascOrders = await queryService.getBuyerOrders({
@@ -146,9 +146,9 @@ async function main() {
       sortOrder: "asc",
     });
 
-    console.log(`\n📈 升序排序结果:`);
+    console.log(`\n📈 Ascending sort results:`);
     ascOrders.orders.forEach((order, index) => {
-      console.log(`   ${index + 1}. 序列号: ${order.buyerSequence}, 状态: ${order.status}`);
+      console.log(`   ${index + 1}. Sequence: ${order.buyerSequence}, Status: ${order.status}`);
     });
 
     const descOrders = await queryService.getBuyerOrders({
@@ -158,19 +158,19 @@ async function main() {
       sortOrder: "desc",
     });
 
-    console.log(`\n📉 降序排序结果:`);
+    console.log(`\n📉 Descending sort results:`);
     descOrders.orders.forEach((order, index) => {
-      console.log(`   ${index + 1}. 序列号: ${order.buyerSequence}, 状态: ${order.status}`);
+      console.log(`   ${index + 1}. Sequence: ${order.buyerSequence}, Status: ${order.status}`);
     });
 
-    console.log("\n🎉 订单查询系统测试完成！");
+    console.log("\n🎉 Order query system test completed!");
   } catch (error) {
-    console.error("❌ 测试失败:", error);
+    console.error("❌ Test failed:", error);
     process.exit(1);
   }
 }
 
-// 运行主函数
+// Run main function
 if (require.main === module) {
   main().catch(console.error);
 }

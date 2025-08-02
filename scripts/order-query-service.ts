@@ -3,16 +3,16 @@ import { Program, AnchorProvider } from "@coral-xyz/anchor";
 import { SolanaECommerce } from "../target/types/solana_e_commerce";
 import { PublicKey, Connection } from "@solana/web3.js";
 
-// 设置网络代理和环境变量
+// Setup network proxy and environment variables
 process.env.https_proxy = "http://127.0.0.1:7890";
 process.env.http_proxy = "http://127.0.0.1:7890";
 process.env.ANCHOR_PROVIDER_URL =
   "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef";
 process.env.ANCHOR_WALLET = "/Users/liudong/.config/solana/id.json";
 
-// 数据类型定义
+// Data type definitions
 interface OrderWithDetails {
-  // 基础订单信息
+  // Basic order information
   buyer: string;
   merchant: string;
   productId: number;
@@ -21,11 +21,11 @@ interface OrderWithDetails {
   status: string;
   createdAt: number;
 
-  // PDA信息
+  // PDA information
   orderPDA: string;
   merchantOrderPDA?: string;
 
-  // 序列号信息
+  // Sequence number information
   buyerSequence: number;
   merchantSequence?: number;
 }
@@ -66,21 +66,35 @@ class OrderQueryService {
   }
 
   /**
-   * 获取买家订单列表
+   * Calculate PDA using the same logic as the program
+   */
+  private calculatePDA(seeds: (string | Buffer | Uint8Array)[]): [PublicKey, number] {
+    const seedBuffers = seeds.map((seed) => {
+      if (typeof seed === "string") {
+        return Buffer.from(seed, "utf8");
+      } else if (seed instanceof Uint8Array) {
+        return Buffer.from(seed);
+      } else {
+        return seed;
+      }
+    });
+
+    return PublicKey.findProgramAddressSync(seedBuffers, this.program.programId);
+  }
+
+  /**
+   * 获取买家订单列表 - 使用新的PDA种子规则
    */
   async getBuyerOrders(params: BuyerOrderQueryParams): Promise<PaginatedOrderList> {
     const { buyer, page = 0, pageSize = 20, sortOrder = "desc" } = params;
 
-    console.log(`🔍 查询买家订单列表:`);
+    console.log(`🔍 查询买家订单列表 (使用新PDA种子规则):`);
     console.log(`   买家: ${buyer.toString()}`);
     console.log(`   页码: ${page}, 页大小: ${pageSize}, 排序: ${sortOrder}`);
 
     try {
-      // 1. 获取买家购买总数
-      const [userPurchaseCountPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("user_purchase_count"), buyer.toBuffer()],
-        this.program.programId
-      );
+      // 1. 获取买家购买总数 - 使用新的PDA计算方式
+      const [userPurchaseCountPDA] = this.calculatePDA(["user_purchase_count", buyer.toBuffer()]);
 
       console.log(`📊 买家购买计数PDA: ${userPurchaseCountPDA.toString()}`);
 
@@ -159,21 +173,21 @@ class OrderQueryService {
   }
 
   /**
-   * 获取商家订单列表
+   * 获取商家订单列表 - 使用新的PDA种子规则
    */
   async getMerchantOrders(params: MerchantOrderQueryParams): Promise<PaginatedOrderList> {
     const { merchant, page = 0, pageSize = 20, sortOrder = "desc" } = params;
 
-    console.log(`🔍 查询商家订单列表:`);
+    console.log(`🔍 查询商家订单列表 (使用新PDA种子规则):`);
     console.log(`   商家: ${merchant.toString()}`);
     console.log(`   页码: ${page}, 页大小: ${pageSize}, 排序: ${sortOrder}`);
 
     try {
-      // 1. 获取商家订单总数
-      const [merchantOrderCountPDA] = PublicKey.findProgramAddressSync(
-        [Buffer.from("merchant_order_count"), merchant.toBuffer()],
-        this.program.programId
-      );
+      // 1. 获取商家订单总数 - 使用新的PDA计算方式
+      const [merchantOrderCountPDA] = this.calculatePDA([
+        "merchant_order_count",
+        merchant.toBuffer(),
+      ]);
 
       console.log(`📊 商家订单计数PDA: ${merchantOrderCountPDA.toString()}`);
 
@@ -283,22 +297,22 @@ class OrderQueryService {
   }
 
   /**
-   * 获取单个买家订单
+   * 获取单个买家订单 - 使用新的PDA种子规则
    */
   private async fetchSingleBuyerOrder(
     buyer: PublicKey,
     sequence: number
   ): Promise<OrderWithDetails | null> {
     try {
-      // 计算买家订单PDA
-      const [orderPDA] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("buyer_order"),
-          buyer.toBuffer(),
-          new anchor.BN(sequence).toArrayLike(Buffer, "le", 8),
-        ],
-        this.program.programId
-      );
+      // 计算买家订单PDA - 使用新的PDA计算方式
+      const sequenceBytes = new anchor.BN(sequence).toArray("le", 8);
+      const [orderPDA] = this.calculatePDA([
+        "buyer_order",
+        buyer.toBuffer(),
+        Buffer.from(sequenceBytes),
+      ]);
+
+      console.log(`🔍 查询买家订单 ${sequence}: ${orderPDA.toString()}`);
 
       // 获取订单详情
       const order = await this.program.account.order.fetch(orderPDA);
@@ -306,13 +320,13 @@ class OrderQueryService {
       return {
         buyer: order.buyer.toString(),
         merchant: order.merchant.toString(),
-        productId: order.productId.toNumber(),
-        quantity: order.quantity,
-        totalAmount: order.totalAmount.toString(),
-        status: Object.keys(order.status)[0], // 获取枚举的键
-        createdAt: order.createdAt.toNumber(),
+        productId: order.productId ? order.productId.toNumber() : 0,
+        quantity: order.quantity || 0,
+        totalAmount: order.totalAmount ? order.totalAmount.toString() : "0",
+        status: Object.keys(order.status)[0] || "unknown", // 获取枚举的键
+        createdAt: order.createdAt ? order.createdAt.toNumber() : 0,
         orderPDA: orderPDA.toString(),
-        merchantOrderPDA: order.merchantOrderPda.toString(),
+        merchantOrderPDA: order.merchantOrderPda ? order.merchantOrderPda.toString() : "",
         buyerSequence: sequence,
       };
     } catch (error) {
@@ -349,22 +363,22 @@ class OrderQueryService {
   }
 
   /**
-   * 获取单个商家订单索引
+   * 获取单个商家订单索引 - 使用新的PDA种子规则
    */
   private async fetchSingleMerchantOrder(
     merchant: PublicKey,
     sequence: number
   ): Promise<any | null> {
     try {
-      // 计算商家订单PDA
-      const [merchantOrderPDA] = PublicKey.findProgramAddressSync(
-        [
-          Buffer.from("merchant_order"),
-          merchant.toBuffer(),
-          new anchor.BN(sequence).toArrayLike(Buffer, "le", 8),
-        ],
-        this.program.programId
-      );
+      // 计算商家订单PDA - 使用新的PDA计算方式
+      const sequenceBytes = new anchor.BN(sequence).toArray("le", 8);
+      const [merchantOrderPDA] = this.calculatePDA([
+        "merchant_order",
+        merchant.toBuffer(),
+        Buffer.from(sequenceBytes),
+      ]);
+
+      console.log(`🔍 查询商家订单 ${sequence}: ${merchantOrderPDA.toString()}`);
 
       // 获取商家订单索引
       const merchantOrder = await this.program.account.merchantOrder.fetch(merchantOrderPDA);
