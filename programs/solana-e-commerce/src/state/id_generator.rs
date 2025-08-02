@@ -10,7 +10,7 @@ pub struct GlobalIdRoot {
     pub last_merchant_id: u32,
     pub last_global_id: u64,
     pub chunk_size: u32,
-    #[max_len(100)]
+    #[max_len(300)]
     pub merchants: Vec<Pubkey>,
     pub max_products_per_shard: u16,
     pub max_keywords_per_product: u8,

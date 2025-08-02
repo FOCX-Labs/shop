@@ -1542,6 +1542,36 @@ export type SolanaECommerce = {
           }
         },
         {
+          "name": "merchantInfo",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              }
+            ]
+          }
+        },
+        {
           "name": "activeChunk",
           "writable": true
         },
@@ -1868,6 +1898,36 @@ export type SolanaECommerce = {
           "name": "merchant",
           "writable": true,
           "signer": true
+        },
+        {
+          "name": "merchantInfo",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116,
+                  95,
+                  105,
+                  110,
+                  102,
+                  111
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              }
+            ]
+          }
         },
         {
           "name": "product",
