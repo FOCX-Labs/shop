@@ -83,7 +83,7 @@ export class EnhancedBusinessFlowExecutor {
         "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef";
     }
 
-    process.env.ANCHOR_WALLET = process.env.HOME + "/.config/solana/id.json";
+    process.env.ANCHOR_WALLET = "./keys/authority.json";
 
     // Initialize connection
     const provider = anchor.AnchorProvider.env();
@@ -1219,6 +1219,7 @@ export class EnhancedBusinessFlowExecutor {
       // 计算必要的PDA - 使用当前商户地址
       const [globalRootPDA] = this.calculatePDA(["global_id_root"]);
       const [merchantIdAccountPDA] = this.calculatePDA(["merchant_id", merchantPubkey.toBuffer()]);
+      const [merchantInfoPDA] = this.calculatePDA(["merchant_info", merchantPubkey.toBuffer()]);
       const [paymentConfigPDA] = this.calculatePDA(["payment_config"]);
 
       // 获取活跃块信息
@@ -1320,6 +1321,7 @@ export class EnhancedBusinessFlowExecutor {
           merchant: merchantPubkey,
           globalRoot: globalRootPDA,
           merchantIdAccount: merchantIdAccountPDA,
+          merchantInfo: merchantInfoPDA,
           activeChunk: activeChunkPDA,
           paymentConfig: paymentConfigPDA,
           productAccount: productAccountPDA,
@@ -1644,6 +1646,10 @@ export class EnhancedBusinessFlowExecutor {
 
       // 计算基础产品创建所需的PDA
       const [globalRootPDA] = this.calculatePDA(["global_id_root"]);
+      const [merchantInfoPDA] = this.calculatePDA([
+        "merchant_info",
+        merchantKeypair.publicKey.toBuffer(),
+      ]);
       const [paymentConfigPDA] = this.calculatePDA(["payment_config"]);
 
       // 1. 添加基础产品创建指令
@@ -1661,6 +1667,7 @@ export class EnhancedBusinessFlowExecutor {
           merchant: merchantKeypair.publicKey,
           globalRoot: globalRootPDA,
           merchantIdAccount: merchantIdAccountPDA,
+          merchantInfo: merchantInfoPDA,
           activeChunk: activeChunkPDA,
           paymentConfig: paymentConfigPDA,
           productAccount: productBasePDA,

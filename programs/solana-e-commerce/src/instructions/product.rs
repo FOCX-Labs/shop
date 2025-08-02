@@ -8,7 +8,14 @@ pub struct DeleteProduct<'info> {
     #[account(mut)]
     pub merchant: Signer<'info>,
 
-    // Remove merchant_info account - product count statistics is non-core, permission verification through product.merchant
+    #[account(
+        mut,
+        seeds = [b"merchant_info", merchant.key().as_ref()],
+        bump,
+        constraint = merchant_info.owner == merchant.key() @ ErrorCode::Unauthorized
+    )]
+    pub merchant_info: Account<'info, Merchant>,
+
     #[account(
         mut,
         seeds = [b"product", product_id.to_le_bytes().as_ref()],
@@ -82,7 +89,14 @@ pub struct CreateProductBase<'info> {
     )]
     pub merchant_id_account: Account<'info, MerchantIdAccount>,
 
-    // 移除merchant_info账户 - 产品计数统计功能非核心，可通过其他方式获取
+    #[account(
+        mut,
+        seeds = [b"merchant_info", merchant.key().as_ref()],
+        bump,
+        constraint = merchant_info.owner == merchant.key() @ ErrorCode::Unauthorized
+    )]
+    pub merchant_info: Account<'info, Merchant>,
+
     #[account(
         mut,
         constraint = active_chunk.key() == merchant_id_account.active_chunk @ ErrorCode::InvalidActiveChunk
@@ -199,7 +213,8 @@ pub fn create_product_base(
     let mut cursor = std::io::Cursor::new(dst);
     product_data.try_serialize(&mut cursor)?;
 
-    // 5. 商户统计功能已移除 - 可通过查询链上产品账户获取统计信息
+    // 5. 更新商户产品计数
+    ctx.accounts.merchant_info.increment_product_count()?;
 
     msg!(
         "原子化产品创建成功，ID: {}, 名称: {}, 关键词数量: {}",
@@ -395,7 +410,8 @@ pub fn delete_product(
 
     if hard_delete {
         // Hard delete: account will be automatically closed and rent reclaimed to beneficiary through close constraint
-        // Merchant statistics functionality removed - can obtain statistics by querying on-chain product accounts
+        // 更新商户产品计数
+        ctx.accounts.merchant_info.decrement_product_count()?;
 
         msg!(
             "Product hard deleted, ID: {}, force delete: {}, rent reclaimed to beneficiary",

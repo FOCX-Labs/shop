@@ -255,9 +255,7 @@ pub fn register_merchant_atomic(
 
     // 5. 更新全局状态
     global_root.last_global_id = initial_chunk.end_id + 1;
-    global_root
-        .merchants
-        .push(ctx.accounts.merchant_id_account.key());
+    // 移除merchants向量操作 - 改用其他方式追踪商户数量
 
     // 发射事件
     emit!(MerchantRegisteredAtomic {
