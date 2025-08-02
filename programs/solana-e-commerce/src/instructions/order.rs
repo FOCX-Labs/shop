@@ -216,10 +216,10 @@ pub struct ConfirmDelivery<'info> {
     pub program_authority: AccountInfo<'info>,
 
     // === CPI调用外部vault程序所需的账户 ===
-    /// CHECK: Vault账户，使用vault_program_id作为地址
+    /// CHECK: Vault账户，从system_config读取地址
     #[account(
         mut,
-        constraint = vault.key() == system_config.vault_program_id @ ErrorCode::InvalidVaultProgram
+        constraint = vault.key() == system_config.vault_account @ ErrorCode::InvalidVaultAccount
     )]
     pub vault: UncheckedAccount<'info>,
 
@@ -236,6 +236,12 @@ pub struct ConfirmDelivery<'info> {
         constraint = platform_token_account.key() == system_config.platform_token_account @ ErrorCode::InvalidPlatformTokenAccount
     )]
     pub platform_token_account: UncheckedAccount<'info>,
+
+    /// CHECK: Vault程序，从system_config读取程序ID
+    #[account(
+        constraint = vault_program.key() == system_config.vault_program_id @ ErrorCode::InvalidVaultProgram
+    )]
+    pub vault_program: UncheckedAccount<'info>,
 
     pub buyer: Signer<'info>,
     pub token_program: Program<'info, Token>,
@@ -524,16 +530,12 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     let program_signer_seeds = &[b"program_authority".as_ref(), &[program_authority_bump]];
     let program_signer = &[&program_signer_seeds[..]];
 
-    // 1. 暂时注释掉CPI调用外部程序的add_rewards指令，避免InstructionFallbackNotFound错误
-    // TODO: 在外部vault程序正确配置后重新启用CPI调用
+    // 1. 处理平台手续费，通过CPI调用外部vault程序
     if platform_fee > 0 {
         msg!(
-            "平台手续费 {} lamports 将保留在程序托管账户中（CPI调用已暂时禁用）",
+            "开始处理平台手续费: {} lamports，调用vault程序进行分配",
             platform_fee
         );
-
-        /*
-        // 原CPI调用代码已注释，避免InstructionFallbackNotFound错误
         // 检查vault程序ID是否有效（不是默认的System Program ID）
         if system_config.vault_program_id != anchor_lang::solana_program::system_program::ID {
             // 根据AddRewards结构体构建CPI调用的账户列表
@@ -546,18 +548,19 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
                 ctx.accounts.program_token_account.to_account_info(),
                 // platform_token_account: Account<'info, TokenAccount>
                 ctx.accounts.platform_token_account.to_account_info(),
-                // reward_source_authority: Signer<'info> (使用买家作为签名者)
-                ctx.accounts.buyer.to_account_info(),
+                // reward_source_authority: Signer<'info> (使用程序权限PDA作为签名者)
+                ctx.accounts.program_authority.to_account_info(),
                 // token_program: Program<'info, Token>
                 ctx.accounts.token_program.to_account_info(),
+                // vault_program: Program<'info, VaultProgram> (添加vault程序账户)
+                ctx.accounts.vault_program.to_account_info(),
             ];
 
             // 构建add_rewards指令数据
             let add_rewards_data = {
                 let mut data = Vec::new();
-                // 添加指令discriminator (通常是方法名的hash前8字节)
-                // 这里使用add_rewards的discriminator，需要根据实际外部程序确定
-                let discriminator = [0x8c, 0x3c, 0x2b, 0x1a, 0x9f, 0x8e, 0x7d, 0x6c]; // 示例discriminator
+                // 添加指令discriminator - 根据vault.json IDL确定的正确discriminator
+                let discriminator = [88, 186, 25, 227, 38, 137, 81, 23]; // add_rewards指令的正确discriminator
                 data.extend_from_slice(&discriminator);
                 // 添加平台手续费金额参数
                 data.extend_from_slice(&platform_fee.to_le_bytes());
@@ -587,9 +590,9 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
                         ctx.accounts.platform_token_account.key(),
                         false,
                     ),
-                    // reward_source_authority (signer) - 买家作为签名者
+                    // reward_source_authority (signer) - 程序权限PDA作为签名者
                     anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
-                        ctx.accounts.buyer.key(),
+                        ctx.accounts.program_authority.key(),
                         true,
                     ),
                     // token_program
@@ -602,10 +605,11 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
             };
 
             // 尝试调用外部程序，如果失败则记录日志但不中断确认收货流程
-            // 使用普通invoke而不是invoke_signed，因为买家已经是签名者
-            match anchor_lang::solana_program::program::invoke(
+            // 使用invoke_signed，因为程序权限PDA需要签名
+            match anchor_lang::solana_program::program::invoke_signed(
                 &add_rewards_instruction,
                 &add_rewards_accounts,
+                program_signer,
             ) {
                 Ok(_) => {
                     msg!(
@@ -627,7 +631,6 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
                 platform_fee
             );
         }
-        */
     }
 
     // 3. 转移剩余金额（商户实收）到商户保证金账户

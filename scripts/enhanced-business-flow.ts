@@ -569,8 +569,9 @@ export class EnhancedBusinessFlowExecutor {
       vaultProgramId: new PublicKey("EHiKn3J5wywNG2rHV2Qt74AfNqtJajhPerkVzYXudEwn"), // Vault程序ID
 
       // Vault相关账户配置
+      vaultAccount: new PublicKey("8hDcWvDXvZHcqneLAPBQMjCY9Bpwatdyv16fx7Pf3fys"), // Vault数据账户 (修正为用户提供的正确地址)
       vaultTokenAccount: new PublicKey("GSzHB4ZRdA26yZRXRnSvTx41YJFQnBivifaNn6XKHQy1"), // Vault Token账户
-      platformTokenAccount: new PublicKey("11111111111111111111111111111112"), // 平台Token账户 (临时地址)
+      platformTokenAccount: new PublicKey("HKSDubsoppVK9tyPBonLZbfu4z16Pb4qQimugnFgARdq"), // 平台Token账户 (使用您提供的地址)
     };
 
     // 调用 initialize_system 指令
@@ -658,8 +659,9 @@ export class EnhancedBusinessFlowExecutor {
       vaultProgramId: new PublicKey("EHiKn3J5wywNG2rHV2Qt74AfNqtJajhPerkVzYXudEwn"), // Vault程序ID
 
       // Vault相关账户配置
+      vaultAccount: new PublicKey("8hDcWvDXvZHcqneLAPBQMjCY9Bpwatdyv16fx7Pf3fys"), // Vault数据账户 (修正为用户提供的正确地址)
       vaultTokenAccount: new PublicKey("GSzHB4ZRdA26yZRXRnSvTx41YJFQnBivifaNn6XKHQy1"), // Vault Token账户
-      platformTokenAccount: new PublicKey("11111111111111111111111111111112"), // 平台Token账户 (临时地址)
+      platformTokenAccount: new PublicKey("HKSDubsoppVK9tyPBonLZbfu4z16Pb4qQimugnFgARdq"), // 平台Token账户 (使用您提供的地址)
     };
 
     // 调用 initialize_system_config 指令
@@ -3142,14 +3144,19 @@ export class EnhancedBusinessFlowExecutor {
       // 获取vault相关账户地址（从SystemConfig读取）
       const systemConfigAccount = await this.program.account.systemConfig.fetch(systemConfigPDA);
       const vaultProgramId = systemConfigAccount.vaultProgramId;
+      const vaultAccount = systemConfigAccount.vaultAccount;
       const vaultTokenAccount = systemConfigAccount.vaultTokenAccount;
       const platformTokenAccount = systemConfigAccount.platformTokenAccount;
 
       console.log(`   🏦 Vault程序ID: ${vaultProgramId.toString()}`);
+      console.log(`   🏦 Vault数据账户: ${vaultAccount.toString()}`);
       console.log(`   🪙 Vault Token账户: ${vaultTokenAccount.toString()}`);
       console.log(`   💰 平台Token账户: ${platformTokenAccount.toString()}`);
 
-      // 执行确认收货指令（包含vault相关账户）
+      // 使用真实的买家Keypair确保一致性
+      const realBuyerKeypair = this.buyerKeypair;
+
+      // 执行确认收货指令（包含vault相关账户和买家Token账户）
       const signature = await this.program.methods
         .confirmDelivery()
         .accounts({
@@ -3161,14 +3168,15 @@ export class EnhancedBusinessFlowExecutor {
           programTokenAccount: programTokenAccountPDA,
           programAuthority: programAuthorityPDA,
           // === CPI调用外部vault程序所需的账户 ===
-          vault: vaultProgramId, // 使用vault_program_id作为vault账户地址
+          vault: vaultAccount, // 使用正确的vault数据账户
           vaultTokenAccount: vaultTokenAccount,
           platformTokenAccount: platformTokenAccount,
-          buyer: buyer,
+          vaultProgram: vaultProgramId, // 外部Vault程序账户
+          buyer: realBuyerKeypair.publicKey, // 修复：使用realBuyerKeypair.publicKey确保一致性
           tokenProgram: TOKEN_PROGRAM_ID,
           systemProgram: anchor.web3.SystemProgram.programId,
         } as any)
-        .signers([this.buyerKeypair])
+        .signers([realBuyerKeypair]) // 使用真实的买家私钥签名确认收货交易
         .rpc();
 
       await this.connection.confirmTransaction(signature);

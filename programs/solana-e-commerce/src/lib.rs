@@ -484,6 +484,7 @@ pub struct SystemConfig {
     pub vault_program_id: Pubkey, // Vault program ID for CPI calls to add_rewards
 
     // Vault相关账户配置
+    pub vault_account: Pubkey,          // Vault数据账户地址（PDA）
     pub vault_token_account: Pubkey,    // Vault的Token账户地址
     pub platform_token_account: Pubkey, // 平台Token账户地址
 }
@@ -508,6 +509,7 @@ impl Default for SystemConfig {
             vault_program_id: Pubkey::default(), // Needs to be set during initialization
 
             // Default vault账户配置
+            vault_account: Pubkey::default(), // Needs to be set during initialization
             vault_token_account: Pubkey::default(), // Needs to be set during initialization
             platform_token_account: Pubkey::default(), // Needs to be set during initialization
         }

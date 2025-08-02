@@ -219,6 +219,8 @@ pub enum ErrorCode {
     // Vault related errors
     #[msg("Invalid vault program")]
     InvalidVaultProgram,
+    #[msg("Invalid vault account")]
+    InvalidVaultAccount,
     #[msg("Invalid vault token account")]
     InvalidVaultTokenAccount,
     #[msg("Invalid platform token account")]
