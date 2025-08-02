@@ -4,7 +4,7 @@ import { Connection, PublicKey, Keypair } from "@solana/web3.js";
 import { SolanaECommerce } from "../target/types/solana_e_commerce";
 import fs from "fs";
 
-// 商户产品查询参数接口
+// Merchant product query parameters interface
 interface MerchantProductQueryParams {
   merchant: PublicKey;
   page?: number;
@@ -16,7 +16,7 @@ interface MerchantProductQueryParams {
   keyword?: string;
 }
 
-// 产品详情接口
+// Product details interface
 interface ProductWithDetails {
   id: number;
   merchant: string;
@@ -35,7 +35,7 @@ interface ProductWithDetails {
   keywordArray?: string[];
 }
 
-// 分页产品列表接口
+// Paginated product list interface
 interface PaginatedProductList {
   products: ProductWithDetails[];
   totalCount: number;
@@ -47,7 +47,7 @@ interface PaginatedProductList {
   sortOrder?: "asc" | "desc";
 }
 
-// 商户产品查询服务类
+// Merchant product query service class
 class MerchantProductQueryService {
   private program: Program<SolanaECommerce>;
   private connection: Connection;
@@ -58,62 +58,106 @@ class MerchantProductQueryService {
   }
 
   /**
-   * 获取商户产品列表
+   * Calculate PDA using the same logic as the program
+   */
+  private calculatePDA(seeds: (string | Buffer | Uint8Array)[]): [PublicKey, number] {
+    const seedBuffers = seeds.map((seed) => {
+      if (typeof seed === "string") {
+        return Buffer.from(seed, "utf8");
+      } else if (seed instanceof Uint8Array) {
+        return Buffer.from(seed);
+      } else {
+        return seed;
+      }
+    });
+
+    return PublicKey.findProgramAddressSync(seedBuffers, this.program.programId);
+  }
+
+  /**
+   * Get merchant product list using new seed rules
    */
   async getMerchantProducts(params: MerchantProductQueryParams): Promise<PaginatedProductList> {
     const { merchant, page = 0, pageSize = 20, sortBy = "created_at", sortOrder = "desc" } = params;
 
-    console.log(`🔍 查询商户产品列表:`);
-    console.log(`   商户: ${merchant.toString()}`);
-    console.log(`   页码: ${page}, 页大小: ${pageSize}`);
-    console.log(`   排序: ${sortBy} ${sortOrder}`);
+    console.log(`🔍 Querying merchant product list using new seed rules:`);
+    console.log(`   Merchant: ${merchant.toString()}`);
+    console.log(`   Page: ${page}, Page size: ${pageSize}`);
+    console.log(`   Sort: ${sortBy} ${sortOrder}`);
 
     try {
-      // 1. 使用getProgramAccounts获取所有商户产品
-      const accounts = await this.connection.getProgramAccounts(this.program.programId, {
-        filters: [
-          {
-            memcmp: {
-              offset: 8 + 8, // 跳过discriminator(8) + id(8)
-              bytes: merchant.toBase58(),
-            },
-          },
-        ],
-      });
+      // 1. First get merchant info to find product_count
+      const merchantInfoPDA = this.calculatePDA(["merchant_info", merchant.toBuffer()])[0];
 
-      console.log(`✅ 找到 ${accounts.length} 个产品账户`);
+      console.log(`🏪 Merchant info PDA: ${merchantInfoPDA.toString()}`);
 
-      // 2. 解析产品数据
+      let merchantInfo: any;
+      try {
+        merchantInfo = await this.program.account.merchant.fetch(merchantInfoPDA);
+        console.log(
+          `✅ Found merchant info, product_count: ${merchantInfo.productCount.toNumber()}`
+        );
+      } catch (error) {
+        console.log(`⚠️ Merchant info not found, assuming no products`);
+        return {
+          products: [],
+          totalCount: 0,
+          page,
+          pageSize,
+          hasNext: false,
+          hasPrev: false,
+          sortBy,
+          sortOrder,
+        };
+      }
+
+      const productCount = merchantInfo.productCount.toNumber();
+      console.log(`📊 Total products for merchant: ${productCount}`);
+
+      // 2. Query each product using new PDA calculation
       const products: ProductWithDetails[] = [];
 
-      for (const account of accounts) {
+      for (let i = 0; i < productCount; i++) {
         try {
-          const productData = this.program.coder.accounts.decode(
-            "productBase",
-            account.account.data
-          );
-          const formattedProduct = this.formatProductData(productData, account.pubkey);
+          // Calculate product PDA using new seed rules: ["product", merchant_pubkey, product_count]
+          const productCountBytes = new anchor.BN(i).toArray("le", 8);
+          const [productPDA] = this.calculatePDA([
+            "product",
+            merchant.toBuffer(),
+            Buffer.from(productCountBytes),
+          ]);
+
+          console.log(`🔍 Querying product ${i}: ${productPDA.toString()}`);
+
+          // Try to fetch the product account
+          const productData = await this.program.account.productBase.fetch(productPDA);
+          const formattedProduct = this.formatProductData(productData, productPDA);
           products.push(formattedProduct);
+
+          console.log(`✅ Successfully loaded product ${i}: ${productData.name}`);
         } catch (error) {
-          console.warn(`⚠️ 解析产品账户失败: ${account.pubkey.toString()}`, error);
+          console.warn(`⚠️ Failed to load product ${i}:`, error);
+          // Continue to next product instead of failing completely
         }
       }
 
-      console.log(`✅ 成功解析 ${products.length} 个产品`);
+      console.log(`✅ Successfully loaded ${products.length} out of ${productCount} products`);
 
-      // 3. 应用过滤条件
+      // 3. Apply filter conditions
       let filteredProducts = this.applyFilters(products, params);
-      console.log(`🔍 过滤后产品数量: ${filteredProducts.length}`);
+      console.log(`🔍 Product count after filtering: ${filteredProducts.length}`);
 
-      // 4. 排序
+      // 4. Sort
       filteredProducts = this.sortProducts(filteredProducts, sortBy, sortOrder);
 
-      // 5. 分页
+      // 5. Pagination
       const startIndex = page * pageSize;
       const endIndex = startIndex + pageSize;
       const paginatedProducts = filteredProducts.slice(startIndex, endIndex);
 
-      console.log(`📄 分页结果: ${startIndex}-${endIndex}, 实际返回: ${paginatedProducts.length}`);
+      console.log(
+        `📄 Pagination result: ${startIndex}-${endIndex}, actually returned: ${paginatedProducts.length}`
+      );
 
       return {
         products: paginatedProducts,
@@ -126,40 +170,46 @@ class MerchantProductQueryService {
         sortOrder,
       };
     } catch (error) {
-      console.error(`❌ 获取商户产品失败:`, error);
+      console.error(`❌ Failed to get merchant products:`, error);
       throw error;
     }
   }
 
   /**
-   * 格式化产品数据
+   * Format product data
    */
   private formatProductData(productData: any, productPDA: PublicKey): ProductWithDetails {
-    const keywordArray = productData.keywords
-      ? productData.keywords.split(",").filter((k: string) => k.trim())
-      : [];
+    // Handle keywords - they might be stored as an array or string
+    let keywordArray: string[] = [];
+    if (productData.keywords) {
+      if (Array.isArray(productData.keywords)) {
+        keywordArray = productData.keywords.filter((k: string) => k && k.trim());
+      } else if (typeof productData.keywords === "string") {
+        keywordArray = productData.keywords.split(",").filter((k: string) => k.trim());
+      }
+    }
 
     return {
-      id: productData.id.toNumber(),
+      id: productData.id ? productData.id.toNumber() : 0,
       merchant: productData.merchant.toString(),
-      name: productData.name,
-      description: productData.description,
-      price: productData.price.toString(),
+      name: productData.name || "Unknown Product",
+      description: productData.description || "",
+      price: productData.price ? productData.price.toString() : "0",
       keywords: keywordArray,
-      inventory: productData.inventory.toNumber(),
-      sales: productData.sales,
-      isActive: productData.isActive,
-      createdAt: productData.createdAt.toNumber(),
-      updatedAt: productData.updatedAt.toNumber(),
-      paymentToken: productData.paymentToken.toString(),
-      shippingLocation: productData.shippingLocation,
+      inventory: productData.inventory ? productData.inventory.toNumber() : 0,
+      sales: productData.sales || 0,
+      isActive: productData.isActive !== undefined ? productData.isActive : true,
+      createdAt: productData.createdAt ? productData.createdAt.toNumber() : 0,
+      updatedAt: productData.updatedAt ? productData.updatedAt.toNumber() : 0,
+      paymentToken: productData.paymentToken ? productData.paymentToken.toString() : "",
+      shippingLocation: productData.shippingLocation || "",
       productPDA: productPDA.toString(),
       keywordArray,
     };
   }
 
   /**
-   * 应用过滤条件
+   * Apply filter conditions
    */
   private applyFilters(
     products: ProductWithDetails[],
@@ -167,12 +217,12 @@ class MerchantProductQueryService {
   ): ProductWithDetails[] {
     let filtered = products;
 
-    // 激活状态过滤
+    // Active status filter
     if (params.isActive !== undefined) {
       filtered = filtered.filter((product) => product.isActive === params.isActive);
     }
 
-    // 价格范围过滤
+    // Price range filter
     if (params.priceRange) {
       filtered = filtered.filter((product) => {
         const price = parseInt(product.price);
@@ -180,7 +230,7 @@ class MerchantProductQueryService {
       });
     }
 
-    // 关键词过滤
+    // Keyword filter
     if (params.keyword) {
       const keyword = params.keyword.toLowerCase();
       filtered = filtered.filter(
@@ -195,7 +245,7 @@ class MerchantProductQueryService {
   }
 
   /**
-   * 排序产品
+   * Sort products
    */
   private sortProducts(
     products: ProductWithDetails[],
@@ -306,8 +356,15 @@ function displayProduct(product: ProductWithDetails, index: number) {
 async function main() {
   console.log("🚀 商户产品列表查询测试开始");
 
+  // 设置网络代理
+  process.env.https_proxy = "http://127.0.0.1:7890";
+  process.env.http_proxy = "http://127.0.0.1:7890";
+
   // 设置连接
-  const connection = new Connection("http://localhost:8899", "confirmed");
+  const connection = new Connection(
+    "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef",
+    "confirmed"
+  );
 
   // 创建钱包和provider
   const wallet = new anchor.Wallet(Keypair.generate()); // 临时钱包，仅用于查询
@@ -320,8 +377,8 @@ async function main() {
   const queryService = new MerchantProductQueryService(program, connection);
 
   try {
-    // 使用实际创建产品的商户地址
-    const merchantPublicKey = new PublicKey("GN2dMTPh9Us4t7URvjTKyjBbkUieT5f998kTkkCyXCQg");
+    // 使用enhanced-business-flow.ts中创建的商户地址
+    const merchantPublicKey = new PublicKey("EqmeCvUSfz3puTw4LdsYNEVMrHn7fuUtDc3REW8LoxTv");
 
     console.log(`👤 商户地址: ${merchantPublicKey.toString()}`);
 
