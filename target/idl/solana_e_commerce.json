@@ -1142,6 +1142,9 @@
           "writable": true
         },
         {
+          "name": "vault_program"
+        },
+        {
           "name": "buyer",
           "signer": true
         },
@@ -5142,11 +5145,16 @@
     },
     {
       "code": 6098,
+      "name": "InvalidVaultAccount",
+      "msg": "Invalid vault account"
+    },
+    {
+      "code": 6099,
       "name": "InvalidVaultTokenAccount",
       "msg": "Invalid vault token account"
     },
     {
-      "code": 6099,
+      "code": 6100,
       "name": "InvalidPlatformTokenAccount",
       "msg": "Invalid platform token account"
     }
@@ -6148,6 +6156,10 @@
           },
           {
             "name": "vault_program_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "vault_account",
             "type": "pubkey"
           },
           {

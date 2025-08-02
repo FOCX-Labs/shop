@@ -1148,6 +1148,9 @@ export type SolanaECommerce = {
           "writable": true
         },
         {
+          "name": "vaultProgram"
+        },
+        {
           "name": "buyer",
           "signer": true
         },
@@ -5148,11 +5151,16 @@ export type SolanaECommerce = {
     },
     {
       "code": 6098,
+      "name": "invalidVaultAccount",
+      "msg": "Invalid vault account"
+    },
+    {
+      "code": 6099,
       "name": "invalidVaultTokenAccount",
       "msg": "Invalid vault token account"
     },
     {
-      "code": 6099,
+      "code": 6100,
       "name": "invalidPlatformTokenAccount",
       "msg": "Invalid platform token account"
     }
@@ -6154,6 +6162,10 @@ export type SolanaECommerce = {
           },
           {
             "name": "vaultProgramId",
+            "type": "pubkey"
+          },
+          {
+            "name": "vaultAccount",
             "type": "pubkey"
           },
           {
