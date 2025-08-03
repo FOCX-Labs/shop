@@ -3,7 +3,7 @@ module.exports = {
     testEnvironment: "node",
     testMatch: ["**/?(*.)+(spec|test).ts"],
     testTimeout: 60000,
-    // 强制串行执行以避免Solana账户状态冲突
+    // Force serial execution to avoid Solana account state conflicts
     maxWorkers: 1,
     coverageThreshold: {
         global: {
@@ -26,6 +26,6 @@ module.exports = {
         "^.+\\.(ts|tsx)$": "ts-jest",
     },
     verbose: true,
-    // 添加测试序列器以确保确定性的测试执行顺序
+    // Add test sequencer to ensure deterministic test execution order
     testSequencer: "<rootDir>/tests/test-sequencer.js",
 };

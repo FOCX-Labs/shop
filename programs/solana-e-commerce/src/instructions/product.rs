@@ -109,14 +109,14 @@ pub struct CreateProductBase<'info> {
     )]
     pub payment_config: Account<'info, PaymentConfig>,
 
-    /// CHECK: 产品账户将在指令中创建
+    /// CHECK: Product account will be created in the instruction
     #[account(mut)]
     pub product_account: UncheckedAccount<'info>,
 
     pub system_program: Program<'info, System>,
 }
 
-/// 创建ProductExtended指令 - 只处理扩展营销数据
+/// Create ProductExtended instruction - only handle extended marketing data
 #[derive(Accounts)]
 #[instruction(
     product_id: u64,
@@ -207,17 +207,17 @@ pub fn create_product_base(
         bump: 0, // Will be set later
     };
 
-    // 4. 序列化产品数据
+    // 4. Serialize product data
     let mut data = ctx.accounts.product_account.try_borrow_mut_data()?;
     let dst: &mut [u8] = &mut data;
     let mut cursor = std::io::Cursor::new(dst);
     product_data.try_serialize(&mut cursor)?;
 
-    // 5. 更新商户产品计数
+    // 5. Update merchant product count
     ctx.accounts.merchant_info.increment_product_count()?;
 
     msg!(
-        "原子化产品创建成功，ID: {}, 名称: {}, 关键词数量: {}",
+        "Atomic product creation successful, ID: {}, Name: {}, Keyword count: {}",
         product_id,
         name,
         keywords.len()
@@ -251,51 +251,51 @@ pub fn create_product_extended(
         bump: ctx.bumps.product_extended,
     };
 
-    // 设置账户数据
+    // Set account data
     ctx.accounts
         .product_extended
         .set_inner(product_extended_data);
 
-    msg!("ProductExtended创建成功，产品ID: {}", product_id);
+    msg!("ProductExtended created successfully, Product ID: {}", product_id);
 
     Ok(())
 }
 
-// ==================== 辅助函数 ====================
+// ==================== Helper Functions ====================
 
-/// 更新ProductExtended账户的扩展字段
+/// Update extended fields of ProductExtended account
 fn update_product_extended_fields(
     product_extended: &mut ProductExtended,
     image_video_urls: Option<Vec<String>>,
     sales_regions: Option<Vec<String>>,
     logistics_methods: Option<Vec<String>>,
 ) -> Result<()> {
-    // 更新图片视频URL
+    // Update image video URLs
     if let Some(new_image_video_urls) = image_video_urls {
         let urls_string = ProductExtended::vec_to_image_urls_string(new_image_video_urls);
         product_extended.image_video_urls = urls_string;
-        msg!("图片视频URL已更新");
+        msg!("Image video URLs updated");
     }
 
-    // 更新销售区域
+    // Update sales regions
     if let Some(new_sales_regions) = sales_regions {
         let regions_string = ProductExtended::vec_to_sales_regions_string(new_sales_regions);
         product_extended.sales_regions = regions_string;
-        msg!("销售区域已更新");
+        msg!("Sales regions updated");
     }
 
-    // 更新物流方式
+    // Update logistics methods
     if let Some(new_logistics_methods) = logistics_methods {
         let methods_string =
             ProductExtended::vec_to_logistics_methods_string(new_logistics_methods);
         product_extended.logistics_methods = methods_string;
-        msg!("物流方式已更新");
+        msg!("Logistics methods updated");
     }
 
     Ok(())
 }
 
-/// 创建产品账户的辅助函数
+/// Helper function to create product account
 fn create_product_account<'info>(
     payer: &Signer<'info>,
     product_account: &AccountInfo<'info>,
@@ -334,30 +334,30 @@ fn create_product_account<'info>(
     Ok(())
 }
 
-// 辅助函数：生成下一个产品ID
+// Helper function: generate next product ID
 fn generate_next_product_id(
     merchant_account: &mut Account<MerchantIdAccount>,
     active_chunk: &mut Account<IdChunk>,
 ) -> Result<u64> {
-    // 检查当前块是否有可用ID
+    // Check if current chunk has available IDs
     if active_chunk.is_full() {
         return Err(ErrorCode::NoAvailableId.into());
     }
 
-    // 查找下一个可用的ID
+    // Find next available ID
     let mut local_id = active_chunk.next_available;
     while local_id < active_chunk.capacity() {
         if !active_chunk.is_id_used(local_id) {
-            // 分配这个ID
+            // Allocate this ID
             active_chunk.mark_id_used(local_id);
             active_chunk.next_available = local_id + 1;
             merchant_account.last_local_id = local_id;
 
-            // 使用 activeChunk.startId + localId 计算产品ID
+            // Use activeChunk.startId + localId to calculate product ID
             let product_id = active_chunk.start_id + local_id;
 
             msg!(
-                "生成产品ID: startId {} + 本地ID {} = {}",
+                "Generated product ID: startId {} + local ID {} = {}",
                 active_chunk.start_id,
                 local_id,
                 product_id
@@ -410,7 +410,7 @@ pub fn delete_product(
 
     if hard_delete {
         // Hard delete: account will be automatically closed and rent reclaimed to beneficiary through close constraint
-        // 更新商户产品计数
+        // Update merchant product count
         ctx.accounts.merchant_info.decrement_product_count()?;
 
         msg!(
@@ -469,18 +469,18 @@ pub fn update_product_price(
     let product = &mut ctx.accounts.product;
     let old_price = product.price;
 
-    // 验证权限：只有商品所有者可以修改价格
+    // Verify permission: only product owner can modify price
     require!(
         product.merchant == ctx.accounts.merchant.key(),
         ErrorCode::Unauthorized
     );
 
-    // 更新产品价格
+    // Update product price
     product.price = new_price;
     product.updated_at = Clock::get()?.unix_timestamp;
 
     msg!(
-        "商品价格更新成功，ID: {}, 旧价格: {} -> 新价格: {}",
+        "Product price update successful, ID: {}, Old price: {} -> New price: {}",
         product.id,
         old_price,
         new_price
@@ -564,12 +564,12 @@ pub fn update_product(
         product.update_keywords(new_keywords)?;
     }
 
-    // 更新库存
+    // Update inventory
     if let Some(new_inventory) = inventory {
         product.inventory = new_inventory;
     }
 
-    // 更新支付代币
+    // Update payment token
     if let Some(new_payment_token) = payment_token {
         require!(
             ctx.accounts
@@ -580,20 +580,20 @@ pub fn update_product(
         product.payment_token = new_payment_token;
     }
 
-    // 注意：token_decimals 和 token_price 字段已移除，价格统一使用 price 字段
+    // Note: token_decimals and token_price fields have been removed, price is unified using the price field
 
-    // 更新发货地点（这个字段在ProductBase中）
+    // Update shipping location (this field is in ProductBase)
     if let Some(new_shipping_location) = shipping_location {
         product.shipping_location = new_shipping_location;
     }
 
-    // 处理ProductExtended扩展字段更新
+    // Handle ProductExtended extended field updates
     let has_extended_updates =
         image_video_urls.is_some() || sales_regions.is_some() || logistics_methods.is_some();
 
     if has_extended_updates {
         if let Some(product_extended) = &mut ctx.accounts.product_extended {
-            // ProductExtended账户存在，直接更新
+            // ProductExtended account exists, update directly
             update_product_extended_fields(
                 product_extended,
                 image_video_urls,
@@ -601,28 +601,28 @@ pub fn update_product(
                 logistics_methods,
             )?;
 
-            msg!("ProductExtended字段更新成功");
+            msg!("ProductExtended fields updated successfully");
         } else {
-            // ProductExtended账户不存在，需要先创建
-            msg!("警告: ProductExtended账户不存在，无法更新扩展字段。请先调用create_product_extended指令创建扩展账户。");
+            // ProductExtended account does not exist, need to create first
+            msg!("Warning: ProductExtended account does not exist, cannot update extended fields. Please call create_product_extended instruction first to create the extended account.");
 
-            // 记录尝试更新的字段
+            // Record fields that were attempted to be updated
             if image_video_urls.is_some() {
-                msg!("尝试更新图片视频URL，但ProductExtended账户不存在");
+                msg!("Attempted to update image video URLs, but ProductExtended account does not exist");
             }
             if sales_regions.is_some() {
-                msg!("尝试更新销售区域，但ProductExtended账户不存在");
+                msg!("Attempted to update sales regions, but ProductExtended account does not exist");
             }
             if logistics_methods.is_some() {
-                msg!("尝试更新物流方式，但ProductExtended账户不存在");
+                msg!("Attempted to update logistics methods, but ProductExtended account does not exist");
             }
         }
     }
 
-    // 更新时间戳
+    // Update timestamp
     product.updated_at = Clock::get()?.unix_timestamp;
 
-    msg!("商品信息更新成功，ID: {}", product.id);
+    msg!("Product information updated successfully, ID: {}", product.id);
 
     Ok(())
 }

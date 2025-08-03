@@ -51,7 +51,7 @@ pub struct CreateOrder<'info> {
     )]
     pub merchant: Account<'info, Merchant>,
 
-    // 商户订单相关账户（集成到CreateOrder中）
+    // Merchant order related accounts (integrated into CreateOrder)
     #[account(
         init_if_needed,
         payer = buyer,
@@ -83,7 +83,7 @@ pub struct CreateOrder<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// 商户发货
+// Merchant shipping
 #[derive(Accounts)]
 pub struct ShipOrder<'info> {
     #[account(mut)]
@@ -106,7 +106,7 @@ pub struct ShipOrder<'info> {
     pub authority: Signer<'info>,
 }
 
-// 买家请求退款（直接退款）
+// Buyer requests refund (direct refund)
 #[derive(Accounts)]
 pub struct RefundOrder<'info> {
     #[account(
@@ -115,9 +115,9 @@ pub struct RefundOrder<'info> {
     )]
     pub order: Account<'info, Order>,
 
-    // 移除order_stats账户 - 统计功能非核心，可通过其他方式获取
+    // Remove order_stats account - statistics functionality is not core, can be obtained through other methods
 
-    // 主程序统一托管账户（退款来源）
+    // Main program unified escrow account (refund source)
     #[account(
         mut,
         seeds = [b"program_token_account", payment_token_mint.key().as_ref()],
@@ -128,7 +128,7 @@ pub struct RefundOrder<'info> {
     #[account(mut)]
     pub buyer_token_account: Account<'info, TokenAccount>,
 
-    /// CHECK: 程序权限账户，用于控制Token转账
+    /// CHECK: Program authority account, used to control token transfers
     #[account(
         seeds = [b"program_authority"],
         bump
@@ -141,9 +141,9 @@ pub struct RefundOrder<'info> {
     pub token_program: Program<'info, Token>,
 }
 
-// 商家批准退款指令已移除，买家可直接退款
+// Merchant approval refund instruction has been removed, buyer can refund directly
 
-// 初始化订单统计
+// Initialize order statistics
 #[derive(Accounts)]
 pub struct InitializeOrderStats<'info> {
     #[account(
@@ -161,7 +161,7 @@ pub struct InitializeOrderStats<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// 确认收货
+// Confirm delivery
 #[derive(Accounts)]
 pub struct ConfirmDelivery<'info> {
     #[account(
@@ -177,7 +177,7 @@ pub struct ConfirmDelivery<'info> {
     )]
     pub order_stats: Account<'info, OrderStats>,
 
-    // 商户信息账户（用于更新保证金余额）
+    // Merchant info account (for updating deposit balance)
     #[account(
         mut,
         seeds = [b"merchant_info", order.merchant.as_ref()],
@@ -185,7 +185,7 @@ pub struct ConfirmDelivery<'info> {
     )]
     pub merchant_info: Account<'info, crate::state::Merchant>,
 
-    // 系统配置账户（获取保证金代币mint和平台手续费配置）
+    // System config account (get deposit token mint and platform fee configuration)
     #[account(
         seeds = [b"system_config"],
         bump
@@ -199,7 +199,7 @@ pub struct ConfirmDelivery<'info> {
     )]
     pub program_token_account: Account<'info, TokenAccount>,
 
-    // 保证金托管账户（接收确认收货的资金）
+    // Deposit escrow account (receive funds from confirmed delivery)
     #[account(
         mut,
         seeds = [b"deposit_escrow", system_config.deposit_token_mint.as_ref()],
@@ -208,36 +208,36 @@ pub struct ConfirmDelivery<'info> {
     )]
     pub deposit_escrow_account: Account<'info, TokenAccount>,
 
-    /// CHECK: 程序权限账户，用于控制Token转账
+    /// CHECK: Program authority account, used to control token transfers
     #[account(
         seeds = [b"program_authority"],
         bump
     )]
     pub program_authority: AccountInfo<'info>,
 
-    // === CPI调用外部vault程序所需的账户 ===
-    /// CHECK: Vault账户，从system_config读取地址
+    // === CPI call external vault program required accounts ===
+    /// CHECK: Vault account, read address from system_config
     #[account(
         mut,
         constraint = vault.key() == system_config.vault_account @ ErrorCode::InvalidVaultAccount
     )]
     pub vault: UncheckedAccount<'info>,
 
-    /// CHECK: Vault Token账户，从system_config读取地址
+    /// CHECK: Vault Token account, read address from system_config
     #[account(
         mut,
         constraint = vault_token_account.key() == system_config.vault_token_account @ ErrorCode::InvalidVaultTokenAccount
     )]
     pub vault_token_account: UncheckedAccount<'info>,
 
-    /// CHECK: 平台Token账户，从system_config读取地址
+    /// CHECK: Platform Token account, read address from system_config
     #[account(
         mut,
         constraint = platform_token_account.key() == system_config.platform_token_account @ ErrorCode::InvalidPlatformTokenAccount
     )]
     pub platform_token_account: UncheckedAccount<'info>,
 
-    /// CHECK: Vault程序，从system_config读取程序ID
+    /// CHECK: Vault program, read program ID from system_config
     #[account(
         constraint = vault_program.key() == system_config.vault_program_id @ ErrorCode::InvalidVaultProgram
     )]
@@ -248,7 +248,7 @@ pub struct ConfirmDelivery<'info> {
     pub system_program: Program<'info, System>,
 }
 
-// 获取订单统计
+// Get order statistics
 #[derive(Accounts)]
 pub struct GetOrderStats<'info> {
     #[account(
@@ -258,7 +258,7 @@ pub struct GetOrderStats<'info> {
     pub order_stats: Account<'info, OrderStats>,
 }
 
-// 指令实现
+// Instruction implementation
 pub fn initialize_order_stats(ctx: Context<InitializeOrderStats>) -> Result<()> {
     let order_stats = &mut ctx.accounts.order_stats;
 
@@ -270,7 +270,7 @@ pub fn initialize_order_stats(ctx: Context<InitializeOrderStats>) -> Result<()> 
     order_stats.total_revenue = 0;
     order_stats.bump = ctx.bumps.order_stats;
 
-    msg!("订单统计系统初始化成功");
+    msg!("Order statistics system initialized successfully");
 
     Ok(())
 }
@@ -304,14 +304,14 @@ pub fn create_order(
         ErrorCode::InvalidMerchant
     );
 
-    // 初始化或更新用户购买计数
+    // Initialize or update user purchase count
     if user_purchase_count.buyer == Pubkey::default() {
         user_purchase_count.initialize(buyer.key(), ctx.bumps.user_purchase_count)?;
     }
 
     let _purchase_count = user_purchase_count.increment_count()?;
 
-    // 初始化或更新商户订单计数
+    // Initialize or update merchant order count
     if merchant_order_count.merchant == Pubkey::default() {
         merchant_order_count.initialize(merchant.owner, ctx.bumps.merchant_order_count)?;
     }
@@ -340,10 +340,10 @@ pub fn create_order(
     order.transaction_signature = transaction_signature;
     order.bump = ctx.bumps.order;
 
-    // 验证订单数据
+    // Validate order data
     order.validate()?;
 
-    // 初始化商户订单作为索引
+    // Initialize merchant order as index
     merchant_order.initialize_as_index(
         merchant.owner,
         buyer.key(),
@@ -353,11 +353,11 @@ pub fn create_order(
         ctx.bumps.merchant_order,
     )?;
 
-    // 更新订单统计
+    // Update order statistics
     order_stats.update_for_new_order(order);
 
     msg!(
-        "双订单创建成功: 买家订单PDA: {}, 商户订单PDA: {}, 买家: {}, 商户: {}, 商品: {}, 数量: {}, 总金额: {} lamports, 商户订单序列号: {}",
+        "Dual order creation successful: Buyer order PDA: {}, Merchant order PDA: {}, Buyer: {}, Merchant: {}, Product: {}, Quantity: {}, Total amount: {} lamports, Merchant order sequence: {}",
         order.key(),
         merchant_order.key(),
         buyer.key(),
@@ -401,26 +401,26 @@ pub fn ship_order(ctx: Context<ShipOrder>, tracking_number: String) -> Result<()
         order.total_amount,
     );
 
-    msg!("商户发货成功: 物流单号: {}", tracking_number);
+    msg!("Merchant shipping successful: Tracking number: {}", tracking_number);
 
     Ok(())
 }
 
-// 买家直接退款
+// Buyer direct refund
 pub fn refund_order(ctx: Context<RefundOrder>, refund_reason: String) -> Result<()> {
     let order = &mut ctx.accounts.order;
-    // 移除order_stats引用 - 统计功能已简化
+    // Remove order_stats reference - statistics functionality has been simplified
 
-    // 验证订单状态必须是已发货
+    // Verify order status must be shipped
     require!(order.can_request_refund(), ErrorCode::OrderCannotBeRefunded);
 
-    // 验证退款原因长度
+    // Verify refund reason length
     require!(
         refund_reason.len() <= 500,
         ErrorCode::InvalidOrderNotesLength
     );
 
-    // 执行Token退款：从主程序托管账户直接转给买家
+    // Execute token refund: transfer directly from main program escrow account to buyer
     let program_authority_bump = ctx.bumps.program_authority;
     let program_signer_seeds = &[b"program_authority".as_ref(), &[program_authority_bump]];
     let program_signer = &[&program_signer_seeds[..]];
@@ -437,14 +437,14 @@ pub fn refund_order(ctx: Context<RefundOrder>, refund_reason: String) -> Result<
 
     let current_time = Clock::get()?.unix_timestamp;
 
-    // 更新订单状态为已退款
+    // Update order status to refunded
     order.update_status(OrderManagementStatus::Refunded, current_time)?;
     order.refund_reason = refund_reason.clone();
 
-    // 统计信息更新已移除 - 可通过查询链上订单账户获取统计信息
+    // Statistics update removed - can get statistics by querying on-chain order accounts
 
     msg!(
-        "买家直接退款成功: 买家: {}, 退款金额: {} tokens, 退款原因: {}",
+        "Buyer direct refund successful: Buyer: {}, Refund amount: {} tokens, Refund reason: {}",
         order.buyer,
         order.total_amount,
         refund_reason
@@ -453,18 +453,18 @@ pub fn refund_order(ctx: Context<RefundOrder>, refund_reason: String) -> Result<
     Ok(())
 }
 
-// 商家批准退款函数已移除，买家可直接退款
+// Merchant approval refund function has been removed, buyer can refund directly
 
 pub fn get_order_stats(ctx: Context<GetOrderStats>) -> Result<()> {
     let order_stats = &ctx.accounts.order_stats;
 
-    msg!("订单统计信息:");
-    msg!("总订单数: {}", order_stats.total_orders);
-    msg!("待处理: {}", order_stats.pending_orders);
-    msg!("已发货: {}", order_stats.shipped_orders);
-    msg!("已送达: {}", order_stats.delivered_orders);
-    msg!("已退款: {}", order_stats.refunded_orders);
-    msg!("总收入: {} lamports", order_stats.total_revenue);
+    msg!("Order statistics:");
+    msg!("Total orders: {}", order_stats.total_orders);
+    msg!("Pending: {}", order_stats.pending_orders);
+    msg!("Shipped: {}", order_stats.shipped_orders);
+    msg!("Delivered: {}", order_stats.delivered_orders);
+    msg!("Refunded: {}", order_stats.refunded_orders);
+    msg!("Total revenue: {} lamports", order_stats.total_revenue);
 
     Ok(())
 }
@@ -475,19 +475,19 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     let merchant_info = &mut ctx.accounts.merchant_info;
     let system_config = &ctx.accounts.system_config;
 
-    // 验证订单状态必须是已发货
+    // Verify order status must be shipped
     require!(
         order.status == OrderManagementStatus::Shipped,
         ErrorCode::InvalidOrderStatusTransition
     );
 
-    // 验证订单的支付Token与保证金Token一致
+    // Verify that order payment token matches deposit token
     require!(
         order.payment_token == system_config.deposit_token_mint,
         ErrorCode::InvalidDepositToken
     );
 
-    // 智能确认收货逻辑：检查是否为自动确认收货
+    // Smart delivery confirmation logic: check if it's auto-confirmation
     let current_time = Clock::get()?.unix_timestamp;
     let is_auto_confirm = if let Some(shipped_at) = order.shipped_at {
         let auto_confirm_seconds = system_config.auto_confirm_days as i64 * 24 * 60 * 60;
@@ -497,10 +497,10 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
         false
     };
 
-    // 如果是自动确认收货，记录日志
+    // If it's auto-confirmation, log it
     if is_auto_confirm {
         msg!(
-            "自动确认收货触发: 买家 {}, 发货时间: {}, 当前时间: {}, 自动确认天数: {}天",
+            "Auto-confirmation triggered: Buyer {}, Shipped at: {}, Current time: {}, Auto-confirm days: {} days",
             order.buyer,
             order.shipped_at.unwrap_or(0),
             current_time,
@@ -508,13 +508,13 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
         );
     } else {
         msg!(
-            "手动确认收货: 买家 {}, 确认时间: {}",
+            "Manual delivery confirmation: Buyer {}, Confirmation time: {}",
             order.buyer,
             current_time
         );
     }
 
-    // 计算平台手续费
+    // Calculate platform fee
     let total_amount = order.total_amount;
     let platform_fee_rate = ctx.accounts.system_config.platform_fee_rate as u64;
     let platform_fee = total_amount
@@ -525,44 +525,44 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
         .checked_sub(platform_fee)
         .ok_or(ErrorCode::IntegerOverflow)?;
 
-    // 简化逻辑：使用程序权限直接从主程序托管账户转移到商户保证金账户
+    // Simplified logic: use program authority to transfer directly from main program escrow account to merchant deposit account
     let program_authority_bump = ctx.bumps.program_authority;
     let program_signer_seeds = &[b"program_authority".as_ref(), &[program_authority_bump]];
     let program_signer = &[&program_signer_seeds[..]];
 
-    // 1. 处理平台手续费，通过CPI调用外部vault程序
+    // 1. Process platform fee through CPI call to external vault program
     if platform_fee > 0 {
         msg!(
-            "开始处理平台手续费: {} lamports，调用vault程序进行分配",
+            "Start processing platform fee: {} lamports, calling vault program for distribution",
             platform_fee
         );
-        // 检查vault程序ID是否有效（不是默认的System Program ID）
+        // Check if vault program ID is valid (not default System Program ID)
         if system_config.vault_program_id != anchor_lang::solana_program::system_program::ID {
-            // 根据AddRewards结构体构建CPI调用的账户列表
+            // Build CPI call account list based on AddRewards struct
             let add_rewards_accounts = vec![
                 // vault: Account<'info, Vault>
                 ctx.accounts.vault.to_account_info(),
                 // vault_token_account: Account<'info, TokenAccount>
                 ctx.accounts.vault_token_account.to_account_info(),
-                // reward_source_account: Account<'info, TokenAccount> (使用程序Token账户)
+                // reward_source_account: Account<'info, TokenAccount> (use program token account)
                 ctx.accounts.program_token_account.to_account_info(),
                 // platform_token_account: Account<'info, TokenAccount>
                 ctx.accounts.platform_token_account.to_account_info(),
-                // reward_source_authority: Signer<'info> (使用程序权限PDA作为签名者)
+                // reward_source_authority: Signer<'info> (use program authority PDA as signer)
                 ctx.accounts.program_authority.to_account_info(),
                 // token_program: Program<'info, Token>
                 ctx.accounts.token_program.to_account_info(),
-                // vault_program: Program<'info, VaultProgram> (添加vault程序账户)
+                // vault_program: Program<'info, VaultProgram> (add vault program account)
                 ctx.accounts.vault_program.to_account_info(),
             ];
 
-            // 构建add_rewards指令数据
+            // Build add_rewards instruction data
             let add_rewards_data = {
                 let mut data = Vec::new();
-                // 添加指令discriminator - 根据vault.json IDL确定的正确discriminator
-                let discriminator = [88, 186, 25, 227, 38, 137, 81, 23]; // add_rewards指令的正确discriminator
+                // Add instruction discriminator - correct discriminator determined from vault.json IDL
+                let discriminator = [88, 186, 25, 227, 38, 137, 81, 23]; // correct discriminator for add_rewards instruction
                 data.extend_from_slice(&discriminator);
-                // 添加平台手续费金额参数
+                // Add platform fee amount parameter
                 data.extend_from_slice(&platform_fee.to_le_bytes());
                 data
             };
@@ -580,7 +580,7 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
                         ctx.accounts.vault_token_account.key(),
                         false,
                     ),
-                    // reward_source_account (mut) - 程序Token账户
+                    // reward_source_account (mut) - program token account
                     anchor_lang::solana_program::instruction::AccountMeta::new(
                         ctx.accounts.program_token_account.key(),
                         false,
@@ -590,7 +590,7 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
                         ctx.accounts.platform_token_account.key(),
                         false,
                     ),
-                    // reward_source_authority (signer) - 程序权限PDA作为签名者
+                    // reward_source_authority (signer) - program authority PDA as signer
                     anchor_lang::solana_program::instruction::AccountMeta::new_readonly(
                         ctx.accounts.program_authority.key(),
                         true,
@@ -604,8 +604,8 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
                 data: add_rewards_data,
             };
 
-            // 尝试调用外部程序，如果失败则记录日志但不中断确认收货流程
-            // 使用invoke_signed，因为程序权限PDA需要签名
+            // Try to call external program, if it fails log but don't interrupt delivery confirmation process
+            // Use invoke_signed because program authority PDA needs to sign
             match anchor_lang::solana_program::program::invoke_signed(
                 &add_rewards_instruction,
                 &add_rewards_accounts,
@@ -613,27 +613,27 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
             ) {
                 Ok(_) => {
                     msg!(
-                        "外部vault程序调用成功，平台手续费: {} lamports",
+                        "External vault program call successful, platform fee: {} lamports",
                         platform_fee
                     );
                 }
                 Err(e) => {
-                    msg!("外部vault程序调用失败，继续确认收货流程。错误: {:?}", e);
+                    msg!("External vault program call failed, continue delivery confirmation process. Error: {:?}", e);
                     msg!(
-                        "平台手续费 {} lamports 将保留在程序托管账户中",
+                        "Platform fee {} lamports will remain in program escrow account",
                         platform_fee
                     );
                 }
             }
         } else {
             msg!(
-                "vault程序ID无效，跳过CPI调用，平台手续费 {} lamports 将保留在程序托管账户中",
+                "Vault program ID invalid, skip CPI call, platform fee {} lamports will remain in program escrow account",
                 platform_fee
             );
         }
     }
 
-    // 3. 转移剩余金额（商户实收）到商户保证金账户
+    // 3. Transfer remaining amount (merchant's actual received) to merchant deposit account
     let merchant_transfer_accounts = Transfer {
         from: ctx.accounts.program_token_account.to_account_info(),
         to: ctx.accounts.deposit_escrow_account.to_account_info(),
@@ -668,7 +668,7 @@ pub fn confirm_delivery(ctx: Context<ConfirmDelivery>) -> Result<()> {
     let program_balance_after = ctx.accounts.program_token_account.amount;
 
     msg!(
-        "确认收货成功: 买家: {}, 确认时间: {}, 订单总金额: {} tokens",
+        "Delivery confirmation successful: Buyer: {}, Confirmation time: {}, Order total amount: {} tokens",
         order.buyer,
         current_time,
         total_amount

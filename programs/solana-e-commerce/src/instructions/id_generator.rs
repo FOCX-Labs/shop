@@ -65,7 +65,7 @@ pub fn generate_product_id(ctx: Context<GenerateId>) -> Result<u64> {
     Err(ErrorCode::NoAvailableId.into())
 }
 
-// 3. 分配新块
+// 3. Allocate new chunk
 #[derive(Accounts)]
 pub struct AllocateChunk<'info> {
     #[account(
@@ -198,7 +198,7 @@ pub fn is_id_exists(ctx: Context<VerifyId>, id: u64) -> Result<bool> {
         ErrorCode::InvalidPda
     );
 
-    // 反序列化ID块并检查
+    // Deserialize ID chunk and check
     let chunk_account_data = ctx.accounts.id_chunk.data.borrow();
     let chunk = IdChunk::try_deserialize(&mut &chunk_account_data[8..])?;
 
@@ -210,7 +210,7 @@ pub fn is_id_exists(ctx: Context<VerifyId>, id: u64) -> Result<bool> {
     Ok(chunk.is_id_used(local_id))
 }
 
-// 5. 批量分配ID
+// 5. Batch allocate IDs
 #[derive(Accounts)]
 pub struct BatchGenerate<'info> {
     #[account(
@@ -316,7 +316,7 @@ pub fn switch_or_allocate_chunk<'info>(
         ],
         program_id,
     );
-    // 这里实际应由外部调用 allocate_new_chunk 指令创建账户
+    // This should actually be called externally by the allocate_new_chunk instruction to create the account
     merchant.active_chunk = chunk_key;
     merchant.last_chunk_index = new_chunk_index;
     root.last_global_id += size as u64;

@@ -73,14 +73,14 @@ pub fn get_merchant_stats(ctx: Context<GetMerchantStats>) -> Result<MerchantStat
     Ok(MerchantStats {
         product_count: merchant_info.product_count,
         total_sales: merchant_info.total_sales,
-        active_products: merchant_info.product_count, // 简化处理
-        total_keywords: 0,                            // 需要从其他地方获取
-        avg_product_price: 0,                         // 需要计算
+        active_products: merchant_info.product_count, // Simplified processing
+        total_keywords: 0,                            // Need to get from elsewhere
+        avg_product_price: 0,                         // Need to calculate
         last_updated: merchant_info.updated_at,
     })
 }
 
-// 设置商户状态
+// Set merchant status
 pub fn set_merchant_status(ctx: Context<UpdateMerchant>, is_active: bool) -> Result<()> {
     let merchant_info = &mut ctx.accounts.merchant_info;
     merchant_info.set_active(is_active)?;
@@ -204,13 +204,13 @@ pub struct RegisterMerchantAtomic<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 原子性商户注册函数（包含ID块分配）
+/// Atomic merchant registration function (including ID chunk allocation)
 pub fn register_merchant_atomic(
     ctx: Context<RegisterMerchantAtomic>,
     name: String,
     description: String,
 ) -> Result<()> {
-    // 获取初始块的key（在借用之前）
+    // Get the key of the initial chunk (before borrowing)
     let initial_chunk_key = ctx.accounts.initial_chunk.key();
 
     let global_root = &mut ctx.accounts.global_root;
@@ -218,7 +218,7 @@ pub fn register_merchant_atomic(
     let merchant_id_account = &mut ctx.accounts.merchant_id_account;
     let initial_chunk = &mut ctx.accounts.initial_chunk;
 
-    // 1. 分配商户ID
+    // 1. Allocate merchant ID
     global_root.last_merchant_id += 1;
     let merchant_id = global_root.last_merchant_id;
 
@@ -233,19 +233,19 @@ pub fn register_merchant_atomic(
         merchant_info_bump,
     )?;
 
-    // 3. 初始化第一个ID块 - 使用基于商户ID的范围
-    let merchant_start_id = merchant_id as u64 * 10000; // 每个商户预留10000个ID
+    // 3. Initialize the first ID chunk - use merchant ID based range
+    let merchant_start_id = merchant_id as u64 * 10000; // Reserve 10000 IDs per merchant
     initial_chunk.merchant_id = merchant_id;
     initial_chunk.chunk_index = 0;
     initial_chunk.start_id = merchant_start_id;
     initial_chunk.end_id = merchant_start_id + global_root.chunk_size as u64 - 1;
     initial_chunk.next_available = 0;
 
-    // 安全初始化bitmap（使用Vec<u8>避免栈溢出）
+    // Safely initialize bitmap (use Vec<u8> to avoid stack overflow)
     initial_chunk.initialize_bitmap();
     initial_chunk.bump = ctx.bumps.initial_chunk;
 
-    // 4. 初始化商户ID分配账户
+    // 4. Initialize merchant ID allocation account
     merchant_id_account.merchant_id = merchant_id;
     merchant_id_account.last_chunk_index = 0;
     merchant_id_account.last_local_id = 0;
@@ -253,11 +253,11 @@ pub fn register_merchant_atomic(
     merchant_id_account.unused_chunks = Vec::new();
     merchant_id_account.bump = ctx.bumps.merchant_id_account;
 
-    // 5. 更新全局状态
+    // 5. Update global state
     global_root.last_global_id = initial_chunk.end_id + 1;
-    // 移除merchants向量操作 - 改用其他方式追踪商户数量
+    // Remove merchants vector operations - use other methods to track merchant count
 
-    // 发射事件
+    // Emit event
     emit!(MerchantRegisteredAtomic {
         merchant: ctx.accounts.merchant.key(),
         merchant_id,
@@ -267,7 +267,7 @@ pub fn register_merchant_atomic(
     });
 
     msg!(
-        "完整商户注册成功，ID: {}, 名称: {}, 初始ID范围: {} - {}",
+        "Complete merchant registration successful, ID: {}, Name: {}, Initial ID range: {} - {}",
         merchant_id,
         name,
         initial_chunk.start_id,

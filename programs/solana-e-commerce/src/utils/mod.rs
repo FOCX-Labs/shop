@@ -169,7 +169,7 @@ pub fn normalize_keyword(keyword: &str) -> String {
         .to_string()
 }
 
-// 计算集合交集
+// Calculate set intersection
 pub fn intersect_sorted_vecs(a: &[u64], b: &[u64]) -> Vec<u64> {
     let mut result = Vec::new();
     let mut i = 0;
@@ -190,7 +190,7 @@ pub fn intersect_sorted_vecs(a: &[u64], b: &[u64]) -> Vec<u64> {
     result
 }
 
-// 计算集合并集
+// Calculate set union
 pub fn union_sorted_vecs(a: &[u64], b: &[u64]) -> Vec<u64> {
     let mut result = Vec::new();
     let mut i = 0;
@@ -214,7 +214,7 @@ pub fn union_sorted_vecs(a: &[u64], b: &[u64]) -> Vec<u64> {
         }
     }
 
-    // 添加剩余元素
+    // Add remaining elements
     while i < a.len() {
         result.push(a[i]);
         i += 1;
@@ -227,12 +227,12 @@ pub fn union_sorted_vecs(a: &[u64], b: &[u64]) -> Vec<u64> {
     result
 }
 
-// 检查向量是否已排序
+// Check if vector is sorted
 pub fn is_sorted(vec: &[u64]) -> bool {
     vec.windows(2).all(|w| w[0] <= w[1])
 }
 
-// 二分搜索
+// Binary search
 pub fn binary_search_range(vec: &[u64], min: u64, max: u64) -> (usize, usize) {
     let start = vec.binary_search(&min).unwrap_or_else(|x| x);
     let end = vec.binary_search(&(max + 1)).unwrap_or_else(|x| x);
