@@ -280,10 +280,10 @@ class MerchantProductQueryService {
   }
 
   /**
-   * 获取商户产品统计信息
+   * Get merchant product statistics
    */
   async getMerchantProductStats(merchant: PublicKey) {
-    console.log(`📊 获取商户产品统计信息: ${merchant.toString()}`);
+    console.log(`📊 Getting merchant product statistics: ${merchant.toString()}`);
 
     try {
       // 获取所有产品用于统计
@@ -315,59 +315,59 @@ class MerchantProductQueryService {
         },
       };
 
-      console.log(`✅ 统计信息:`, stats);
+      console.log(`✅ Statistics:`, stats);
       return stats;
     } catch (error) {
-      console.error(`❌ 获取统计信息失败:`, error);
+      console.error(`❌ Failed to get statistics:`, error);
       throw error;
     }
   }
 }
 
-// 格式化Token金额显示
+// Format token amount display
 function formatTokenAmount(amount: string): string {
   const num = parseInt(amount);
   return (num / 1000000).toFixed(6); // 假设6位小数
 }
 
-// 格式化时间显示
+// Format timestamp display
 function formatTimestamp(timestamp: number): string {
   return new Date(timestamp * 1000).toLocaleString();
 }
 
-// 显示产品详情
+// Display product details
 function displayProduct(product: ProductWithDetails, index: number) {
-  console.log(`\n📦 产品 ${index + 1}:`);
+  console.log(`\n📦 Product ${index + 1}:`);
   console.log(`   ID: ${product.id}`);
-  console.log(`   名称: ${product.name}`);
-  console.log(`   描述: ${product.description}`);
-  console.log(`   价格: ${formatTokenAmount(product.price)} TOKEN`);
-  console.log(`   库存: ${product.inventory}`);
-  console.log(`   销量: ${product.sales}`);
-  console.log(`   状态: ${product.isActive ? "✅ 激活" : "❌ 停用"}`);
-  console.log(`   关键词: ${product.keywords.join(", ")}`);
-  console.log(`   发货地址: ${product.shippingLocation}`);
-  console.log(`   创建时间: ${formatTimestamp(product.createdAt)}`);
-  console.log(`   更新时间: ${formatTimestamp(product.updatedAt)}`);
-  console.log(`   PDA地址: ${product.productPDA}`);
+  console.log(`   Name: ${product.name}`);
+  console.log(`   Description: ${product.description}`);
+  console.log(`   Price: ${formatTokenAmount(product.price)} TOKEN`);
+  console.log(`   Inventory: ${product.inventory}`);
+  console.log(`   Sales: ${product.sales}`);
+  console.log(`   Status: ${product.isActive ? "✅ Active" : "❌ Inactive"}`);
+  console.log(`   Keywords: ${product.keywords.join(", ")}`);
+  console.log(`   Shipping location: ${product.shippingLocation}`);
+  console.log(`   Created at: ${formatTimestamp(product.createdAt)}`);
+  console.log(`   Updated at: ${formatTimestamp(product.updatedAt)}`);
+  console.log(`   PDA address: ${product.productPDA}`);
 }
 
-// 主函数
+// Main function
 async function main() {
-  console.log("🚀 商户产品列表查询测试开始");
+  console.log("🚀 Merchant product list query test started");
 
-  // 设置网络代理
+  // Set network proxy
   process.env.https_proxy = "http://127.0.0.1:7890";
   process.env.http_proxy = "http://127.0.0.1:7890";
 
-  // 设置连接
+  // Set up connection
   const connection = new Connection(
-    "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef",
+    "https://api.devnet.solana.com",
     "confirmed"
   );
 
-  // 创建钱包和provider
-  const wallet = new anchor.Wallet(Keypair.generate()); // 临时钱包，仅用于查询
+  // Create wallet and provider
+  const wallet = new anchor.Wallet(Keypair.generate()); // Temporary wallet, for query only
   const provider = new AnchorProvider(connection, wallet, {
     commitment: "confirmed",
   });
@@ -377,39 +377,39 @@ async function main() {
   const queryService = new MerchantProductQueryService(program, connection);
 
   try {
-    // 使用enhanced-business-flow.ts中创建的商户地址
+    // Use merchant address created in enhanced-business-flow.ts
     const merchantPublicKey = new PublicKey("EqmeCvUSfz3puTw4LdsYNEVMrHn7fuUtDc3REW8LoxTv");
 
-    console.log(`👤 商户地址: ${merchantPublicKey.toString()}`);
+    console.log(`👤 Merchant address: ${merchantPublicKey.toString()}`);
 
-    // 1. 获取商户产品统计信息
+    // 1. Get merchant product statistics
     console.log("\n" + "=".repeat(60));
-    console.log("📊 商户产品统计信息");
+    console.log("📊 Merchant Product Statistics");
     console.log("=".repeat(60));
 
     const stats = await queryService.getMerchantProductStats(merchantPublicKey);
 
-    console.log(`📈 产品统计:`);
-    console.log(`   总产品数: ${stats.totalProducts}`);
-    console.log(`   激活产品: ${stats.activeProducts}`);
-    console.log(`   停用产品: ${stats.inactiveProducts}`);
-    console.log(`   总库存: ${stats.totalInventory}`);
-    console.log(`   总销量: ${stats.totalSales}`);
-    console.log(`   平均价格: ${formatTokenAmount(stats.averagePrice.toString())} TOKEN`);
+    console.log(`📈 Product statistics:`);
+    console.log(`   Total products: ${stats.totalProducts}`);
+    console.log(`   Active products: ${stats.activeProducts}`);
+    console.log(`   Inactive products: ${stats.inactiveProducts}`);
+    console.log(`   Total inventory: ${stats.totalInventory}`);
+    console.log(`   Total sales: ${stats.totalSales}`);
+    console.log(`   Average price: ${formatTokenAmount(stats.averagePrice.toString())} TOKEN`);
     console.log(
-      `   价格范围: ${formatTokenAmount(stats.priceRange.min.toString())} - ${formatTokenAmount(
+      `   Price range: ${formatTokenAmount(stats.priceRange.min.toString())} - ${formatTokenAmount(
         stats.priceRange.max.toString()
       )} TOKEN`
     );
 
     if (stats.totalProducts === 0) {
-      console.log("\n⚠️ 该商户暂无产品，请先创建产品后再测试查询功能");
+      console.log("\n⚠️ This merchant has no products yet, please create products first before testing query functionality");
       return;
     }
 
-    // 2. 基础产品列表查询（第一页）
+    // 2. Basic product list query (first page)
     console.log("\n" + "=".repeat(60));
-    console.log("📋 基础产品列表查询（第一页，按创建时间降序）");
+    console.log("📋 Basic Product List Query (First Page, Sorted by Creation Time Descending)");
     console.log("=".repeat(60));
 
     const basicQuery = await queryService.getMerchantProducts({
@@ -420,20 +420,20 @@ async function main() {
       sortOrder: "desc",
     });
 
-    console.log(`\n📄 分页信息:`);
-    console.log(`   当前页: ${basicQuery.page + 1}`);
-    console.log(`   页大小: ${basicQuery.pageSize}`);
-    console.log(`   总数量: ${basicQuery.totalCount}`);
-    console.log(`   有下一页: ${basicQuery.hasNext ? "是" : "否"}`);
-    console.log(`   有上一页: ${basicQuery.hasPrev ? "是" : "否"}`);
+    console.log(`\n📄 Pagination info:`);
+    console.log(`   Current page: ${basicQuery.page + 1}`);
+    console.log(`   Page size: ${basicQuery.pageSize}`);
+    console.log(`   Total count: ${basicQuery.totalCount}`);
+    console.log(`   Has next page: ${basicQuery.hasNext ? "Yes" : "No"}`);
+    console.log(`   Has previous page: ${basicQuery.hasPrev ? "Yes" : "No"}`);
 
     basicQuery.products.forEach((product, index) => {
       displayProduct(product, index);
     });
 
-    // 3. 按价格排序查询
+    // 3. Query sorted by price
     console.log("\n" + "=".repeat(60));
-    console.log("💰 按价格升序排序查询");
+    console.log("💰 Query Sorted by Price Ascending");
     console.log("=".repeat(60));
 
     const priceQuery = await queryService.getMerchantProducts({
@@ -446,13 +446,13 @@ async function main() {
 
     priceQuery.products.forEach((product, index) => {
       console.log(
-        `\n💰 产品 ${index + 1}: ${product.name} - ${formatTokenAmount(product.price)} TOKEN`
+        `\n💰 Product ${index + 1}: ${product.name} - ${formatTokenAmount(product.price)} TOKEN`
       );
     });
 
-    // 4. 按销量排序查询
+    // 4. Query sorted by sales
     console.log("\n" + "=".repeat(60));
-    console.log("🔥 按销量降序排序查询");
+    console.log("🔥 Query Sorted by Sales Descending");
     console.log("=".repeat(60));
 
     const salesQuery = await queryService.getMerchantProducts({
@@ -464,12 +464,12 @@ async function main() {
     });
 
     salesQuery.products.forEach((product, index) => {
-      console.log(`\n🔥 产品 ${index + 1}: ${product.name} - 销量: ${product.sales}`);
+      console.log(`\n🔥 Product ${index + 1}: ${product.name} - Sales: ${product.sales}`);
     });
 
-    // 5. 激活状态过滤查询
+    // 5. Active status filter query
     console.log("\n" + "=".repeat(60));
-    console.log("✅ 只查询激活状态的产品");
+    console.log("✅ Only Query Active Products");
     console.log("=".repeat(60));
 
     const activeQuery = await queryService.getMerchantProducts({
@@ -478,19 +478,19 @@ async function main() {
       pageSize: 10,
     });
 
-    console.log(`✅ 激活产品数量: ${activeQuery.totalCount}`);
+    console.log(`✅ Number of active products: ${activeQuery.totalCount}`);
     activeQuery.products.slice(0, 3).forEach((product, index) => {
-      console.log(`   ${index + 1}. ${product.name} (${product.isActive ? "激活" : "停用"})`);
+      console.log(`   ${index + 1}. ${product.name} (${product.isActive ? "Active" : "Inactive"})`);
     });
 
-    console.log("\n🎉 商户产品列表查询测试完成！");
+    console.log("\n🎉 Merchant product list query test completed!");
   } catch (error) {
-    console.error("❌ 测试失败:", error);
+    console.error("❌ Test failed:", error);
     process.exit(1);
   }
 }
 
-// 运行主函数
+// Run main function
 if (require.main === module) {
   main().catch(console.error);
 }

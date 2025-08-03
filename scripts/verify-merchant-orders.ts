@@ -3,17 +3,17 @@ import { Connection, PublicKey } from "@solana/web3.js";
 import { SolanaECommerce } from "../target/types/solana_e_commerce";
 
 /**
- * 验证商户订单查询功能
+ * Verify merchant order query functionality
  */
 class MerchantOrderVerifier {
   private connection: Connection;
   private program: anchor.Program<SolanaECommerce>;
 
   constructor() {
-    // 连接到本地网络
+    // Connect to local network
     this.connection = new Connection("http://localhost:8899", "confirmed");
 
-    // 设置provider
+    // Set provider
     const provider = new anchor.AnchorProvider(
       this.connection,
       new anchor.Wallet(anchor.web3.Keypair.generate()),
@@ -21,12 +21,12 @@ class MerchantOrderVerifier {
     );
     anchor.setProvider(provider);
 
-    // 初始化程序
+    // Initialize program
     this.program = anchor.workspace.SolanaECommerce as anchor.Program<SolanaECommerce>;
   }
 
   /**
-   * 计算PDA
+   * Calculate PDA
    */
   private calculatePDA(seeds: (string | Buffer)[]): [PublicKey, number] {
     const seedBuffers = seeds.map((seed) =>
@@ -36,20 +36,20 @@ class MerchantOrderVerifier {
   }
 
   /**
-   * 查询商户的所有订单
+   * Query all merchant orders
    */
   async queryMerchantOrders(merchantPublicKey: PublicKey): Promise<void> {
-    console.log(`\n🔍 查询商户订单: ${merchantPublicKey.toString()}`);
+    console.log(`\n🔍 Querying merchant orders: ${merchantPublicKey.toString()}`);
     console.log("=====================================");
 
     try {
-      // 1. 查询商户订单计数账户
+      // 1. Query merchant order count account
       const [merchantOrderCountPDA] = this.calculatePDA([
         "merchant_order_count",
         merchantPublicKey.toBuffer(),
       ]);
 
-      console.log(`📊 商户订单计数PDA: ${merchantOrderCountPDA.toString()}`);
+      console.log(`📊 Merchant order count PDA: ${merchantOrderCountPDA.toString()}`);
 
       let totalOrders = 0;
       try {
@@ -57,13 +57,13 @@ class MerchantOrderVerifier {
           merchantOrderCountPDA
         );
         totalOrders = merchantOrderCountAccount.totalOrders.toNumber();
-        console.log(`📈 商户总订单数: ${totalOrders}`);
+        console.log(`📈 Total merchant orders: ${totalOrders}`);
       } catch (error) {
-        console.log(`❌ 商户订单计数账户不存在或无法获取`);
+        console.log(`❌ Merchant order count account does not exist or cannot be retrieved`);
         return;
       }
 
-      // 2. 查询每个商户订单
+      // 2. Query each merchant order
       for (let i = 1; i <= totalOrders; i++) {
         const [merchantOrderPDA] = this.calculatePDA([
           "merchant_order",
@@ -71,7 +71,7 @@ class MerchantOrderVerifier {
           new anchor.BN(i).toArrayLike(Buffer, "le", 8),
         ]);
 
-        console.log(`\n🏪 商户订单 ${i}:`);
+        console.log(`\n🏪 Merchant order ${i}:`);
         console.log(`   PDA: ${merchantOrderPDA.toString()}`);
 
         try {
@@ -79,62 +79,62 @@ class MerchantOrderVerifier {
             merchantOrderPDA
           );
 
-          console.log(`   商户: ${merchantOrderAccount.merchant.toString()}`);
-          console.log(`   买家: ${merchantOrderAccount.buyer.toString()}`);
-          console.log(`   序列号: ${merchantOrderAccount.merchantOrderSequence.toNumber()}`);
-          console.log(`   买家订单PDA: ${merchantOrderAccount.buyerOrderPda.toString()}`);
-          console.log(`   产品ID: ${merchantOrderAccount.productId.toNumber()}`);
+          console.log(`   Merchant: ${merchantOrderAccount.merchant.toString()}`);
+          console.log(`   Buyer: ${merchantOrderAccount.buyer.toString()}`);
+          console.log(`   Sequence: ${merchantOrderAccount.merchantOrderSequence.toNumber()}`);
+          console.log(`   Buyer order PDA: ${merchantOrderAccount.buyerOrderPda.toString()}`);
+          console.log(`   Product ID: ${merchantOrderAccount.productId.toNumber()}`);
           console.log(
-            `   创建时间: ${new Date(
+            `   Created at: ${new Date(
               merchantOrderAccount.createdAt.toNumber() * 1000
             ).toLocaleString()}`
           );
 
-          // 3. 查询对应的买家订单详情
+          // 3. Query corresponding buyer order details
           try {
             const buyerOrderAccount = await this.program.account.order.fetch(
               merchantOrderAccount.buyerOrderPda
             );
 
-            console.log(`   📦 买家订单详情:`);
-            console.log(`      数量: ${buyerOrderAccount.quantity}`);
-            console.log(`      价格: ${buyerOrderAccount.price.toNumber()}`);
-            console.log(`      总金额: ${buyerOrderAccount.totalAmount.toNumber()}`);
-            console.log(`      状态: ${JSON.stringify(buyerOrderAccount.status)}`);
-            console.log(`      发货地址: ${buyerOrderAccount.shippingAddress}`);
-            console.log(`      备注: ${buyerOrderAccount.notes}`);
+            console.log(`   📦 Buyer order details:`);
+            console.log(`      Quantity: ${buyerOrderAccount.quantity}`);
+            console.log(`      Price: ${buyerOrderAccount.price.toNumber()}`);
+            console.log(`      Total amount: ${buyerOrderAccount.totalAmount.toNumber()}`);
+            console.log(`      Status: ${JSON.stringify(buyerOrderAccount.status)}`);
+            console.log(`      Shipping address: ${buyerOrderAccount.shippingAddress}`);
+            console.log(`      Notes: ${buyerOrderAccount.notes}`);
             if (buyerOrderAccount.trackingNumber) {
-              console.log(`      物流单号: ${buyerOrderAccount.trackingNumber}`);
+              console.log(`      Tracking number: ${buyerOrderAccount.trackingNumber}`);
             }
           } catch (error) {
-            console.log(`   ❌ 无法获取买家订单详情: ${error}`);
+            console.log(`   ❌ Failed to fetch buyer order details: ${error}`);
           }
         } catch (error) {
-          console.log(`   ❌ 无法获取商户订单: ${error}`);
+          console.log(`   ❌ Failed to fetch merchant order: ${error}`);
         }
       }
     } catch (error) {
-      console.log(`❌ 查询商户订单失败: ${error}`);
+      console.log(`❌ Failed to query merchant orders: ${error}`);
     }
   }
 
   /**
-   * 主验证函数
+   * Main verification function
    */
   async verify(): Promise<void> {
-    console.log("🔍 开始验证商户订单查询功能");
+    console.log("🔍 Starting merchant order query verification");
     console.log("=====================================");
 
-    // 使用本地测试中的商户公钥（从测试日志中获取）
+    // Use merchant public key from local test (from test log)
     const merchantPublicKey = new PublicKey("DxuLkWihYH5VCJZS8dmFqCCkHv7zmMYwUVPN5cv2Lw9Q");
 
     await this.queryMerchantOrders(merchantPublicKey);
 
-    console.log("\n✅ 商户订单查询验证完成");
+    console.log("\n✅ Merchant order query verification completed");
   }
 }
 
-// 执行验证
+// Execute verification
 async function main() {
   const verifier = new MerchantOrderVerifier();
   await verifier.verify();

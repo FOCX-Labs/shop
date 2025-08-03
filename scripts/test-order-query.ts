@@ -9,7 +9,7 @@ async function main() {
 
   // Setup connection
   const connection = new Connection(
-    "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef",
+    "https://api.devnet.solana.com",
     "confirmed"
   );
 

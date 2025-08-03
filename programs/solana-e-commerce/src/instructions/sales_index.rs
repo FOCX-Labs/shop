@@ -73,12 +73,12 @@ pub fn update_product_sales_index(
         sales_node.update_product_sales(product_id, new_sales)?;
         sales_node.update_top_items(product_id, new_sales)?;
 
-        // 重新序列化
+        // Re-serialize
         let mut cursor = std::io::Cursor::new(&mut node_data[..]);
         sales_node.try_serialize(&mut cursor)?;
     } else {
-        // 需要在不同节点间移动产品
-        // 从旧节点移除
+        // Need to move product between different nodes
+        // Remove from old node
         {
             let old_node_data = ctx.accounts.old_sales_node.try_borrow_data()?;
             let mut old_sales_node = SalesIndexNode::try_deserialize(&mut &old_node_data[..])?;
@@ -86,7 +86,7 @@ pub fn update_product_sales_index(
 
             let mut old_node_data = ctx.accounts.old_sales_node.try_borrow_mut_data()?;
 
-            // 验证这是正确的旧销量节点
+            // Verify this is the correct old sales node
             require!(
                 old_sales_node.contains_sales(old_sales),
                 ErrorCode::InvalidSalesRange
@@ -94,7 +94,7 @@ pub fn update_product_sales_index(
 
             old_sales_node.remove_product(product_id)?;
 
-            // 重新序列化旧节点
+            // Re-serialize old node
             let mut cursor = std::io::Cursor::new(&mut old_node_data[..]);
             old_sales_node.try_serialize(&mut cursor)?;
         }
@@ -162,17 +162,17 @@ pub fn search_sales_range(
     offset: u32,
     limit: u16,
 ) -> Result<Vec<u64>> {
-    // 验证销量范围
+    // Verify sales range
     require!(min_sales <= max_sales, ErrorCode::InvalidSalesRange);
 
-    // 反序列化销量索引节点
+    // Deserialize sales index node
     let node_data = ctx.accounts.sales_node.data.borrow();
     let sales_node = SalesIndexNode::try_deserialize(&mut &node_data[8..])?;
 
-    // 获取销量范围内的产品
+    // Get products within sales range
     let all_products = sales_node.get_products_in_range(min_sales, max_sales);
 
-    // 分页处理
+    // Pagination processing
     let start_index = offset as usize;
     let end_index = (start_index + limit as usize).min(all_products.len());
 
@@ -183,7 +183,7 @@ pub fn search_sales_range(
     };
 
     msg!(
-        "销量范围搜索完成，范围: {} - {}, 找到 {} 个结果",
+        "Sales range search completed, range: {} - {}, found {} results",
         min_sales,
         max_sales,
         results.len()
@@ -196,26 +196,26 @@ pub fn get_top_selling_products(
     ctx: Context<GetTopSellingProducts>,
     limit: u16,
 ) -> Result<Vec<ProductSales>> {
-    // 反序列化销量索引根节点
+    // Deserialize sales index root node
     let node_data = ctx.accounts.sales_root.data.borrow();
     let sales_node = SalesIndexNode::try_deserialize(&mut &node_data[8..])?;
 
-    // 获取热销商品（已经按销量排序）
+    // Get bestselling products (already sorted by sales)
     let mut top_products = sales_node.top_items.clone();
 
-    // 限制返回数量
+    // Limit return quantity
     if top_products.len() > limit as usize {
         top_products.truncate(limit as usize);
     }
 
-    msg!("获取热销商品成功，返回 {} 个商品", top_products.len());
+    msg!("Successfully retrieved bestselling products, returned {} products", top_products.len());
 
     Ok(top_products)
 }
 
-// 根据销量查找对应的索引节点范围
+// Find corresponding index node range by sales volume
 pub fn find_sales_node_for_sales(sales: u32) -> (u32, u32) {
-    // 简化的销量范围计算：每1000销量为一个范围
+    // Simplified sales range calculation: each 1000 sales as a range
     let interval = 1000u32;
     let range_start = (sales / interval) * interval;
     let range_end = range_start + interval - 1;
@@ -254,11 +254,11 @@ pub fn update_global_bestsellers(
             .or_insert(item);
     }
 
-    // 转换为排序后的向量
+    // Convert to sorted vector
     let mut result: Vec<ProductSales> = unique_products.into_values().collect();
     result.sort_by(|a, b| b.sales.cmp(&a.sales));
 
-    // 限制为前100名
+    // Limit to top 100
     if result.len() > 100 {
         result.truncate(100);
     }

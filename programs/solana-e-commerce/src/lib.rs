@@ -54,9 +54,9 @@ pub mod solana_e_commerce {
         instructions::id_generator::allocate_new_chunk(ctx)
     }
 
-    // ==================== 商户管理指令 ====================
+    // ==================== Merchant Management Instructions ====================
 
-    // 原子性商户注册指令
+    // Atomic merchant registration instruction
     pub fn register_merchant_atomic(
         ctx: Context<RegisterMerchantAtomic>,
         name: String,
@@ -65,7 +65,7 @@ pub mod solana_e_commerce {
         instructions::merchant::register_merchant_atomic(ctx, name, description)
     }
 
-    // 更新商户信息
+    // Update merchant information
     pub fn update_merchant_info(
         ctx: Context<UpdateMerchant>,
         name: Option<String>,
@@ -74,19 +74,19 @@ pub mod solana_e_commerce {
         instructions::merchant::update_merchant_info(ctx, name, description)
     }
 
-    // 获取商户统计信息
+    // Get merchant statistics information
     pub fn get_merchant_stats(ctx: Context<GetMerchantStats>) -> Result<state::MerchantStats> {
         instructions::merchant::get_merchant_stats(ctx)
     }
 
-    // 关闭商户账户
+    // Close merchant account
     pub fn close_merchant(ctx: Context<CloseMerchant>, force: bool) -> Result<()> {
         instructions::merchant::close_merchant(ctx, force)
     }
 
-    // 商品管理指令
+    // Product management instructions
 
-    // 创建ProductBase（核心业务数据）
+    // Create ProductBase (core business data)
     pub fn create_product_base(
         ctx: Context<CreateProductBase>,
         name: String,
@@ -109,7 +109,7 @@ pub mod solana_e_commerce {
         )
     }
 
-    // 创建ProductExtended（扩展营销数据）
+    // Create ProductExtended (extended marketing data)
     pub fn create_product_extended(
         ctx: Context<CreateProductExtended>,
         product_id: u64,
@@ -126,7 +126,7 @@ pub mod solana_e_commerce {
         )
     }
 
-    // 产品修改指令
+    // Product modification instruction
     pub fn update_product(
         ctx: Context<UpdateProduct>,
         product_id: u64,
@@ -212,14 +212,14 @@ pub mod solana_e_commerce {
         instructions::payment::close_payment_config(ctx, force)
     }
 
-    // 程序Token账户初始化指令
+    // Program Token account initialization instruction
     pub fn initialize_program_token_account(
         ctx: Context<InitializeProgramTokenAccount>,
     ) -> Result<()> {
         instructions::payment::initialize_program_token_account(ctx)
     }
 
-    // 托管购买商品指令 - 集成订单创建
+    // Escrow purchase product instruction - integrates order creation
     pub fn purchase_product_escrow(
         ctx: Context<PurchaseProductEscrow>,
         product_id: u64,
@@ -298,7 +298,7 @@ pub mod solana_e_commerce {
         instructions::price_index::split_price_node(ctx, price_range_start, price_range_end)
     }
 
-    // 销量索引管理指令
+    // Sales index management instructions
     pub fn initialize_sales_index(
         ctx: Context<InitializeSalesIndexIfNeeded>,
         sales_range_start: u32,
@@ -378,7 +378,7 @@ pub mod solana_e_commerce {
         instructions::id_generator::close_merchant_id_account(ctx, merchant_key, force)
     }
 
-    // 订单管理指令
+    // Order management instructions
     pub fn initialize_order_stats(ctx: Context<InitializeOrderStats>) -> Result<()> {
         instructions::order::initialize_order_stats(ctx)
     }

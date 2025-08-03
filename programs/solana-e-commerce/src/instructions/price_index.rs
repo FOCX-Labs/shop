@@ -2,9 +2,9 @@ use crate::error::ErrorCode;
 use crate::state::*;
 use anchor_lang::prelude::*;
 
-/// 计算价格范围的起始值
-/// 使用对数算法：给定价格P，找到满足 2^n ≤ P < 2^(n+1) 的n值
-/// 设置 price_range_start = 2^n
+/// Calculate the starting value of the price range
+/// Using logarithmic algorithm: given price P, find n such that 2^n ≤ P < 2^(n+1)
+/// Set price_range_start = 2^n
 pub fn calculate_price_range_start(price: u64) -> u64 {
     if price == 0 {
         return 0;
@@ -13,21 +13,21 @@ pub fn calculate_price_range_start(price: u64) -> u64 {
         return 1;
     }
 
-    // 找到最大的n，使得2^n <= price
-    // 使用更直观的方法计算 floor(log2(price))
+    // Find the largest n such that 2^n <= price
+    // Use a more intuitive method to calculate floor(log2(price))
     let mut n = 0;
     let mut temp = price;
     while temp > 1 {
         temp >>= 1;
         n += 1;
     }
-    // 现在 n 就是 floor(log2(price))
-    // 对于price=15: floor(log2(15)) = 3, 所以 2^3 = 8
+    // Now n is floor(log2(price))
+    // For price=15: floor(log2(15)) = 3, so 2^3 = 8
     1u64 << n
 }
 
-/// 计算价格范围的结束值
-/// 设置 price_range_end = 2^(n+1)
+/// Calculate the ending value of the price range
+/// Set price_range_end = 2^(n+1)
 pub fn calculate_price_range_end(price: u64) -> u64 {
     if price == 0 {
         return 0;
@@ -36,7 +36,7 @@ pub fn calculate_price_range_end(price: u64) -> u64 {
         return 1;
     }
 
-    // 找到最大的n，使得2^n <= price
+    // Find the largest n such that 2^n <= price
     let mut n = 0;
     let mut temp = price;
     while temp > 1 {
@@ -44,7 +44,7 @@ pub fn calculate_price_range_end(price: u64) -> u64 {
         n += 1;
     }
     // price_range_end = 2^(n+1)
-    // 对于price=15: n=3, 所以 2^(3+1) = 2^4 = 16
+    // For price=15: n=3, so 2^(3+1) = 2^4 = 16
     1u64 << (n + 1)
 }
 
@@ -61,13 +61,13 @@ pub struct RemoveProductFromPriceIndex<'info> {
         bump
     )]
     pub price_node: Account<'info, PriceIndexNode>,
-    // 移除authority账户 - 在函数实现中完全未使用，权限验证通过PDA种子机制实现
+    // Remove authority account - completely unused in function implementation, permission verification through PDA seed mechanism
 }
 
 #[derive(Accounts)]
 #[instruction(min_price: u64, max_price: u64)]
 pub struct SearchPriceRange<'info> {
-    /// CHECK: 将在指令中验证正确的价格索引节点
+    /// CHECK: will verify the correct price index node in the instruction
     #[account()]
     pub price_node: AccountInfo<'info>,
 }
@@ -114,9 +114,9 @@ pub fn remove_product_from_price_index(
     let removed = price_node.remove_product(product_id)?;
 
     if removed {
-        msg!("产品ID {} 成功从价格索引中移除", product_id);
+        msg!("Product ID {} successfully removed from price index", product_id);
     } else {
-        msg!("产品ID {} 不在当前价格索引节点中", product_id);
+        msg!("Product ID {} not in current price index node", product_id);
     }
 
     Ok(())
@@ -129,17 +129,17 @@ pub fn search_price_range(
     offset: u32,
     limit: u16,
 ) -> Result<Vec<u64>> {
-    // 验证价格范围
+    // Verify price range
     require!(min_price <= max_price, ErrorCode::InvalidPriceRange);
 
-    // 反序列化价格索引节点
+    // Deserialize price index node
     let node_data = ctx.accounts.price_node.data.borrow();
     let price_node = PriceIndexNode::try_deserialize(&mut &node_data[8..])?;
 
-    // 获取价格范围内的产品
+    // Get products within price range
     let all_products = price_node.get_products_in_range(min_price, max_price);
 
-    // 分页处理
+    // Pagination processing
     let start_index = offset as usize;
     let end_index = (start_index + limit as usize).min(all_products.len());
 
@@ -150,7 +150,7 @@ pub fn search_price_range(
     };
 
     msg!(
-        "价格范围搜索完成，范围: {} - {}, 找到 {} 个结果",
+        "Price range search completed, range: {} - {}, found {} results",
         min_price,
         max_price,
         results.len()
@@ -167,34 +167,34 @@ pub fn split_price_node(
     let price_node = &mut ctx.accounts.price_node;
     let new_price_node = &mut ctx.accounts.new_price_node;
 
-    // 计算分割点
+    // Calculate split point
     let split_point = (price_range_start + price_range_end) / 2;
 
-    // 调整原节点范围
+    // Adjust original node range
     price_node.price_range_end = split_point;
 
-    // 初始化新节点
+    // Initialize new node
     new_price_node.initialize(split_point + 1, price_range_end, ctx.bumps.new_price_node)?;
 
-    // 重新分配产品到对应节点
+    // Reallocate products to corresponding nodes
     let mut products_to_move = Vec::new();
     for &product_id in &price_node.product_ids.clone() {
-        // 这里需要获取产品的实际价格来判断应该分配到哪个节点
-        // 简化实现：假设产品ID的后几位代表价格区间
+        // Here we need to get the actual price of the product to determine which node it should be allocated to
+        // Simplified implementation: assume the last few digits of product ID represent price range
         let estimated_price = (product_id % 1000) + price_range_start;
         if estimated_price > split_point {
             products_to_move.push(product_id);
         }
     }
 
-    // 移动产品到新节点
+    // Move products to new node
     for product_id in products_to_move {
         price_node.product_ids.retain(|&x| x != product_id);
         new_price_node.product_ids.push(product_id);
     }
 
     msg!(
-        "价格索引节点分裂成功，原范围: {} - {}，新范围: {} - {}",
+        "Price index node split successful, original range: {} - {}, new range: {} - {}",
         price_range_start,
         split_point,
         split_point + 1,
@@ -204,28 +204,28 @@ pub fn split_price_node(
     Ok(())
 }
 
-// 查找适当的价格索引节点
+// Find appropriate price index node
 pub fn find_price_node_for_price(price: u64) -> (u64, u64) {
-    // 简化实现：使用固定的价格区间划分
-    // 实际实现应该遍历价格索引树找到合适的叶子节点
-    let interval = 1000u64; // 每1000单位一个区间
+    // Simplified implementation: use fixed price range division
+    // Actual implementation should traverse the price index tree to find appropriate leaf nodes
+    let interval = 1000u64; // Every 1000 units as one range
     let range_start = (price / interval) * interval;
     let range_end = range_start + interval - 1;
     (range_start, range_end)
 }
 
-// 获取价格索引节点的利用率
+// Get price index node utilization
 pub fn get_price_node_utilization(node: &Account<PriceIndexNode>) -> f32 {
     node.product_ids.len() as f32 / MAX_PRODUCTS_PER_SHARD as f32
 }
 
-// 检查是否需要平衡价格索引树
+// Check if price index tree needs rebalancing
 pub fn should_rebalance_price_tree(node: &Account<PriceIndexNode>) -> bool {
     node.needs_split() || node.needs_merge()
 }
 
 // ============================================================================
-// 智能价格索引指令：自动计算价格范围并管理索引
+// Smart price index instructions: automatically calculate price ranges and manage index
 // ============================================================================
 
 #[cfg(test)]
@@ -234,53 +234,53 @@ mod tests {
 
     #[test]
     fn test_price_range_calculation() {
-        // 测试用例：价格=15时
-        // floor(log2(15)) = 3，所以 2^3=8 <= 15 < 2^4=16
+        // Test case: when price=15
+        // floor(log2(15)) = 3, so 2^3=8 <= 15 < 2^4=16
         // price_range_start=8，price_range_end=16
         assert_eq!(calculate_price_range_start(15), 8);
         assert_eq!(calculate_price_range_end(15), 16);
 
-        // 测试用例：价格=1时，特殊情况
+        // Test case: when price=1, special case
         assert_eq!(calculate_price_range_start(1), 1);
         assert_eq!(calculate_price_range_end(1), 1);
 
-        // 测试用例：价格=8时
-        // floor(log2(8)) = 3，所以 2^3=8 <= 8 < 2^4=16
+        // Test case: when price=8
+        // floor(log2(8)) = 3, so 2^3=8 <= 8 < 2^4=16
         // price_range_start=8，price_range_end=16
         assert_eq!(calculate_price_range_start(8), 8);
         assert_eq!(calculate_price_range_end(8), 16);
 
-        // 测试用例：价格=16时
-        // floor(log2(16)) = 4，所以 2^4=16 <= 16 < 2^5=32
+        // Test case: when price=16
+        // floor(log2(16)) = 4, so 2^4=16 <= 16 < 2^5=32
         // price_range_start=16，price_range_end=32
         assert_eq!(calculate_price_range_start(16), 16);
         assert_eq!(calculate_price_range_end(16), 32);
 
-        // 测试用例：价格=0时，特殊情况
+        // Test case: when price=0, special case
         assert_eq!(calculate_price_range_start(0), 0);
         assert_eq!(calculate_price_range_end(0), 0);
 
-        // 测试用例：价格=2时
-        // floor(log2(2)) = 1，所以 2^1=2 <= 2 < 2^2=4
+        // Test case: when price=2
+        // floor(log2(2)) = 1, so 2^1=2 <= 2 < 2^2=4
         // price_range_start=2，price_range_end=4
         assert_eq!(calculate_price_range_start(2), 2);
         assert_eq!(calculate_price_range_end(2), 4);
 
-        // 测试用例：价格=7时
-        // floor(log2(7)) = 2，所以 2^2=4 <= 7 < 2^3=8
+        // Test case: when price=7
+        // floor(log2(7)) = 2, so 2^2=4 <= 7 < 2^3=8
         // price_range_start=4，price_range_end=8
         assert_eq!(calculate_price_range_start(7), 4);
         assert_eq!(calculate_price_range_end(7), 8);
 
-        // 测试用例：价格=50时
-        // floor(log2(50)) = 5，所以 2^5=32 <= 50 < 2^6=64
+        // Test case: when price=50
+        // floor(log2(50)) = 5, so 2^5=32 <= 50 < 2^6=64
         // price_range_start=32，price_range_end=64
         assert_eq!(calculate_price_range_start(50), 32);
         assert_eq!(calculate_price_range_end(50), 64);
     }
 }
 
-/// 智能价格索引账户结构（使用Anchor标准方法）
+/// Smart price index account structure (using Anchor standard methods)
 #[derive(Accounts)]
 #[instruction(product_id: u64, price: u64, price_range_start: u64, price_range_end: u64)]
 pub struct AddProductToPriceIndex<'info> {
@@ -303,7 +303,7 @@ pub struct AddProductToPriceIndex<'info> {
     pub system_program: Program<'info, System>,
 }
 
-/// 智能添加产品到价格索引
+/// Smart add product to price index
 pub fn add_product_to_price_index(
     ctx: Context<AddProductToPriceIndex>,
     product_id: u64,
@@ -313,7 +313,7 @@ pub fn add_product_to_price_index(
 ) -> Result<()> {
     let price_index = &mut ctx.accounts.price_index;
 
-    // 验证传入的价格范围是否与基于价格计算的范围一致
+    // Verify that the passed price range is consistent with the range calculated based on price
     let expected_start = calculate_price_range_start(price);
     let expected_end = calculate_price_range_end(price);
 
@@ -322,7 +322,7 @@ pub fn add_product_to_price_index(
         ErrorCode::InvalidPriceRange
     );
 
-    // 如果是新创建的账户，先初始化
+    // If it's a newly created account, initialize first
     if price_index.price_range_start == 0 && price_index.price_range_end == 0 {
         price_index.price_range_start = price_range_start;
         price_index.price_range_end = price_range_end;
@@ -334,35 +334,35 @@ pub fn add_product_to_price_index(
         price_index.bump = ctx.bumps.price_index;
 
         msg!(
-            "✅ 新价格索引自动创建: 价格 {} → 范围 [{}, {}]",
+            "✅ New price index automatically created: price {} → range [{}, {}]",
             price,
             price_range_start,
             price_range_end
         );
     }
 
-    // 验证价格在范围内
+    // Verify price is within range
     require!(
         price >= price_index.price_range_start && price <= price_index.price_range_end,
         ErrorCode::InvalidPriceRange
     );
 
-    // 检查产品是否已存在
+    // Check if product already exists
     if price_index.product_ids.contains(&product_id) {
-        msg!("产品 {} 已存在于价格索引中，跳过添加", product_id);
+        msg!("Product {} already exists in price index, skipping addition", product_id);
         return Ok(());
     }
 
-    // 检查索引容量
+    // Check index capacity
     if price_index.product_ids.len() >= 1000 {
         return Err(ErrorCode::ShardIsFull.into());
     }
 
-    // 添加产品ID
+    // Add product ID
     price_index.product_ids.push(product_id);
 
     msg!(
-        "✅ 产品 {} 已添加到价格索引 [{}, {}]，当前产品数: {}",
+        "✅ Product {} added to price index [{}, {}], current product count: {}",
         product_id,
         price_range_start,
         price_range_end,

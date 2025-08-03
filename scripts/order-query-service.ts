@@ -7,7 +7,7 @@ import { PublicKey, Connection } from "@solana/web3.js";
 process.env.https_proxy = "http://127.0.0.1:7890";
 process.env.http_proxy = "http://127.0.0.1:7890";
 process.env.ANCHOR_PROVIDER_URL =
-  "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef";
+  "https://api.devnet.solana.com";
 process.env.ANCHOR_WALLET = "/Users/liudong/.config/solana/id.json";
 
 // Data type definitions
@@ -56,7 +56,7 @@ interface MerchantOrderQueryParams {
 class OrderQueryService {
   private program: Program<SolanaECommerce>;
   private connection: Connection;
-  private readonly BATCH_SIZE = 10; // 批量查询大小
+  private readonly BATCH_SIZE = 10; // Batch query size
 
   constructor() {
     const provider = AnchorProvider.env();

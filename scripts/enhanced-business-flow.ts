@@ -80,7 +80,7 @@ export class EnhancedBusinessFlowExecutor {
 
       // Set Devnet RPC
       process.env.ANCHOR_PROVIDER_URL =
-        "https://devnet.helius-rpc.com/?api-key=48e26d41-1ec0-4a29-ac33-fa26d0112cef";
+        "https://api.devnet.solana.com";
     }
 
     process.env.ANCHOR_WALLET = "./keys/authority.json";
@@ -104,41 +104,41 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
-   * 格式化Token金额显示
+   * Format Token amount display
    */
   private formatTokenAmount(amount: number): string {
     return `${amount} ${this.tokenSymbol}`;
   }
 
   /**
-   * 动态获取Token精度
+   * Dynamically get Token decimals
    */
   private async getTokenDecimals(tokenMint: PublicKey): Promise<number> {
     try {
       const mintInfo = await getMint(this.connection, tokenMint);
       return mintInfo.decimals;
     } catch (error) {
-      console.error(`❌ 获取Token精度失败: ${error}`);
+      console.error(`❌ Failed to get Token decimals: ${error}`);
       throw error;
     }
   }
 
   /**
-   * 根据Token精度计算金额
+   * Calculate amount based on Token decimals
    */
   private calculateTokenAmount(baseAmount: number, decimals: number): number {
     return baseAmount * Math.pow(10, decimals);
   }
 
   /**
-   * 兼容性读取MerchantIdAccount账户数据
-   * 支持从u32格式迁移到u64格式
+   * Compatibility read for MerchantIdAccount account data
+   * Supports migration from u32 format to u64 format
    */
   private async readMerchantIdAccountCompatible(
     merchantIdAccountPDA: PublicKey
   ): Promise<{ merchantId: number; activeChunk: PublicKey }> {
     try {
-      // 尝试新格式读取
+      // Try to read new format
       const merchantIdAccount = await this.program.account.merchantIdAccount.fetch(
         merchantIdAccountPDA
       );
@@ -147,16 +147,16 @@ export class EnhancedBusinessFlowExecutor {
         activeChunk: merchantIdAccount.activeChunk,
       };
     } catch (error) {
-      console.log(`   ⚠️ 商户ID账户新格式读取失败，尝试兼容性读取`);
+      console.log(`   ⚠️ Failed to read Merchant ID account in new format, trying compatibility read`);
 
-      // 手动读取账户数据
+      // Manually read account data
       const accountInfo = await this.connection.getAccountInfo(merchantIdAccountPDA);
       if (!accountInfo) {
-        throw new Error("商户ID账户不存在");
+        throw new Error("Merchant ID account does not exist");
       }
 
       const data = accountInfo.data;
-      console.log(`   📊 商户ID账户数据大小: ${data.length} 字节`);
+      console.log(`   📊 Merchant ID account data size: ${data.length} bytes`);
 
       try {
         // Manually parse old format data
@@ -192,7 +192,7 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
-   * 读取IdChunk账户数据
+   * Read IdChunk account data
    */
   private async readIdChunkData(
     activeChunkPDA: PublicKey
@@ -205,44 +205,44 @@ export class EnhancedBusinessFlowExecutor {
   }
 
   /**
-   * 计算价格范围的起始值
-   * 使用对数算法：给定价格P，找到满足 2^n ≤ P < 2^(n+1) 的n值
-   * 设置 price_range_start = 2^n
+   * Calculate the starting value of the price range
+   * Use logarithmic algorithm: given price P, find n such that 2^n ≤ P < 2^(n+1)
+   * Set price_range_start = 2^n
    */
   private calculatePriceRangeStart(price: number): number {
     if (price === 0) return 0;
     if (price === 1) return 1;
 
-    // 找到最大的n，使得2^n <= price
-    // 例如：price=15时，floor(log2(15))=3，2^3=8 <= 15 < 2^4=16
+    // Find the largest n such that 2^n <= price
+    // For example: price=15, floor(log2(15))=3, 2^3=8 <= 15 < 2^4=16
     const n = Math.floor(Math.log2(price));
     return Math.pow(2, n);
   }
 
   /**
-   * 计算价格范围的结束值
-   * 设置 price_range_end = 2^(n+1)
+   * Calculate the ending value of the price range
+   * Set price_range_end = 2^(n+1)
    */
   private calculatePriceRangeEnd(price: number): number {
     if (price === 0) return 0;
     if (price === 1) return 1;
 
-    // 找到最大的n，使得2^n <= price
-    // 例如：price=15时，floor(log2(15))=3，price_range_end=2^(3+1)=16
+    // Find the largest n such that 2^n <= price
+    // For example: price=15, floor(log2(15))=3, price_range_end=2^(3+1)=16
     const n = Math.floor(Math.log2(price));
     return Math.pow(2, n + 1);
   }
 
   /**
-   * 确保权限账户有足够的Token余额
+   * Ensure the authority account has enough Token balance
    */
   private async ensureAuthorityTokenBalance(): Promise<void> {
     if (!this.tokenMint) {
-      throw new Error("Token mint未初始化");
+      throw new Error("Token mint not initialized");
     }
 
     try {
-      // 获取权限账户的Token账户
+      // Get the authority's Token account
       const authorityTokenAccount = await getOrCreateAssociatedTokenAccount(
         this.connection,
         this.authority,
@@ -250,25 +250,25 @@ export class EnhancedBusinessFlowExecutor {
         this.authority.publicKey
       );
 
-      // 检查余额
+      // Check balance
       const balance = await this.connection.getTokenAccountBalance(authorityTokenAccount.address);
       const currentBalance = balance.value.uiAmount || 0;
 
-      console.log(`   💰 权限账户当前Token余额: ${currentBalance}`);
+      console.log(`   💰 Current Token balance of authority account: ${currentBalance}`);
 
-      // 如果余额不足，尝试铸造更多Token
+      // If balance is insufficient, try to mint more Token
       if (currentBalance < 1000000) {
-        console.log(`   🔄 余额不足，尝试铸造更多Token...`);
+        console.log(`   🔄 Insufficient balance, trying to mint more Token...`);
 
-        // 获取Token mint信息
+        // Get Token mint info
         const mintInfo = await this.connection.getAccountInfo(this.tokenMint);
         if (mintInfo) {
-          // 获取Token精度
+          // Get Token decimals
           const mintData = mintInfo.data;
-          const decimals = mintData[44]; // Mint账户中decimals字段的位置
-          console.log(`   📊 Token精度: ${decimals}位`);
+          const decimals = mintData[44]; // Position of decimals field in Mint account
+          console.log(`   📊 Token decimals: ${decimals} digits`);
 
-          const mintAmount = this.calculateTokenAmount(10000000, decimals); // 铸造10,000,000个Token
+          const mintAmount = this.calculateTokenAmount(10000000, decimals); // Mint 10,000,000 Tokens
 
           try {
             await mintTo(
@@ -279,25 +279,25 @@ export class EnhancedBusinessFlowExecutor {
               this.authority,
               mintAmount
             );
-            console.log(`   ✅ 成功铸造 10,000,000 Token`);
+            console.log(`   ✅ Successfully minted 10,000,000 Token`);
           } catch (mintError) {
             console.log(
-              `   ⚠️ 无法铸造Token（可能不是mint authority）: ${(mintError as Error).message}`
+              `   ⚠️ Unable to mint Token (may not be mint authority): ${(mintError as Error).message}`
             );
           }
         }
       }
     } catch (error) {
-      console.log(`   ⚠️ 检查Token余额失败: ${(error as Error).message}`);
+      console.log(`   ⚠️ Failed to check Token balance: ${(error as Error).message}`);
     }
   }
 
   /**
-   * 更新支付配置以包含正确的Token mint
+   * Update payment configuration to include the correct Token mint
    */
   private async updatePaymentConfig(currentConfig: any): Promise<void> {
     try {
-      console.log(`   🔄 开始更新支付配置...`);
+      console.log(`   🔄 Starting to update payment configuration...`);
 
       // 创建新的支持Token列表，包含当前系统配置中的Token mint
       const updatedSupportedTokens = [
@@ -3084,7 +3084,7 @@ export class EnhancedBusinessFlowExecutor {
 
       console.log(`\n📦 执行确认收货指令...`);
       console.log(`   👤 买家: ${buyer.toString()}`);
-      console.log(`   📊 购买计数: ${purchaseCount}`);
+      console.log(`   📊 Purchase count: ${purchaseCount}`);
 
       // 计算订单PDA（使用新的3元素种子结构）
       const [orderPDA] = this.calculatePDA([
@@ -3093,40 +3093,40 @@ export class EnhancedBusinessFlowExecutor {
         new anchor.BN(purchaseCount + 1).toArrayLike(Buffer, "le", 8),
       ]);
 
-      console.log(`   🔑 订单PDA: ${orderPDA.toString()}`);
+      console.log(`   🔑 Order PDA: ${orderPDA.toString()}`);
 
-      // 验证订单账户存在
+      // Verify order account exists
       const orderAccount = await this.connection.getAccountInfo(orderPDA);
       if (!orderAccount) {
         throw new Error(`订单账户不存在: ${orderPDA.toString()}`);
       }
 
-      console.log(`   ✅ 订单账户存在，大小: ${orderAccount.data.length} bytes`);
+      console.log(`   ✅ Order account exists, size: ${orderAccount.data.length} bytes`);
 
-      // 计算其他必需的PDA
+      // Calculate other required PDAs
       const [orderStatsPDA] = this.calculatePDA(["order_stats"]);
 
-      // 从订单账户获取商户信息
+      // Get merchant info from order account
       const orderAccountInfo = await this.connection.getAccountInfo(orderPDA);
       if (!orderAccountInfo) {
         throw new Error(`订单账户不存在: ${orderPDA.toString()}`);
       }
 
-      // 解析订单数据获取商户公钥
+      // Parse order data to get merchant public key
       let orderData: any;
       let merchantPubkey: PublicKey;
 
       try {
         orderData = this.program.coder.accounts.decode("Order", orderAccountInfo.data);
         merchantPubkey = orderData.merchant;
-        console.log(`   📋 订单数据解析成功`);
-        console.log(`   🏪 订单中的商户: ${merchantPubkey.toString()}`);
-        console.log(`   📊 订单状态: ${orderData.status}`);
+        console.log(`   📋 Order data parsed successfully`);
+        console.log(`   🏪 Merchant in order: ${merchantPubkey.toString()}`);
+        console.log(`   📊 Order status: ${orderData.status}`);
       } catch (error) {
-        console.error(`   ❌ 订单数据解析失败: ${(error as Error).message}`);
-        // 使用测试脚本中的商户公钥作为备选
+        console.error(`   ❌ Failed to parse order data: ${(error as Error).message}`);
+        // Use merchant public key from test script as fallback
         merchantPubkey = this.merchantKeypair!.publicKey;
-        console.log(`   🔄 使用备选商户公钥: ${merchantPubkey.toString()}`);
+        console.log(`   🔄 Using fallback merchant public key: ${merchantPubkey.toString()}`);
       }
 
       const [merchantInfoPDA] = this.calculatePDA(["merchant_info", merchantPubkey.toBuffer()]);
@@ -3138,25 +3138,25 @@ export class EnhancedBusinessFlowExecutor {
       ]);
       const [programAuthorityPDA] = this.calculatePDA(["program_authority"]);
 
-      console.log(`   🏪 商户公钥: ${merchantPubkey.toString()}`);
-      console.log(`   🏪 商户信息PDA: ${merchantInfoPDA.toString()}`);
+      console.log(`   🏪 Merchant public key: ${merchantPubkey.toString()}`);
+      console.log(`   🏪 Merchant info PDA: ${merchantInfoPDA.toString()}`);
 
-      // 获取vault相关账户地址（从SystemConfig读取）
+      // Get vault-related account addresses (read from SystemConfig)
       const systemConfigAccount = await this.program.account.systemConfig.fetch(systemConfigPDA);
       const vaultProgramId = systemConfigAccount.vaultProgramId;
       const vaultAccount = systemConfigAccount.vaultAccount;
       const vaultTokenAccount = systemConfigAccount.vaultTokenAccount;
       const platformTokenAccount = systemConfigAccount.platformTokenAccount;
 
-      console.log(`   🏦 Vault程序ID: ${vaultProgramId.toString()}`);
-      console.log(`   🏦 Vault数据账户: ${vaultAccount.toString()}`);
-      console.log(`   🪙 Vault Token账户: ${vaultTokenAccount.toString()}`);
-      console.log(`   💰 平台Token账户: ${platformTokenAccount.toString()}`);
+      console.log(`   🏦 Vault program ID: ${vaultProgramId.toString()}`);
+      console.log(`   🏦 Vault data account: ${vaultAccount.toString()}`);
+      console.log(`   🪙 Vault Token account: ${vaultTokenAccount.toString()}`);
+      console.log(`   💰 Platform Token account: ${platformTokenAccount.toString()}`);
 
-      // 使用真实的买家Keypair确保一致性
+      // Use real buyer Keypair to ensure consistency
       const realBuyerKeypair = this.buyerKeypair;
 
-      // 执行确认收货指令（包含vault相关账户和买家Token账户）
+      // Execute confirm receipt instruction (includes vault-related accounts and buyer Token account)
       const signature = await this.program.methods
         .confirmDelivery()
         .accounts({
